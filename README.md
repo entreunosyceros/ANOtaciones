@@ -1,5 +1,12 @@
 # ANOtaciones
 
+<p align="center">
+  
+<img width="647" height="628" alt="logo" src="https://github.com/user-attachments/assets/7bb94d63-9b05-4955-a637-2d9febdcfc29" />
+
+</p>
+
+
 Espacio local tipo Notion para notas, tableros Kanban y bases de datos. Todo corre en el navegador: sin backend ni cuenta.
 
 ## Características
