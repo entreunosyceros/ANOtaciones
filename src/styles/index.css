@@ -1,0 +1,198 @@
+@import "tailwindcss";
+
+@custom-variant dark (&:where(.dark, .dark *));
+
+@theme {
+  --color-notion-bg: var(--notion-bg);
+  --color-notion-sidebar: var(--notion-sidebar);
+  --color-notion-text: var(--notion-text);
+  --color-notion-border: var(--notion-border);
+  --color-notion-hover: var(--notion-hover);
+  --color-notion-active: var(--notion-active);
+}
+
+:root {
+  --notion-bg: #ffffff;
+  --notion-sidebar: #f7f7f5;
+  --notion-text: #37352f;
+  --notion-border: #e9e9e7;
+  --notion-hover: rgba(55, 53, 47, 0.08);
+  --notion-active: rgba(55, 53, 47, 0.12);
+}
+
+.dark {
+  --notion-bg: #191919;
+  --notion-sidebar: #202020;
+  --notion-text: #ffffffcf;
+  --notion-border: #2f2f2f;
+  --notion-hover: rgba(255, 255, 255, 0.055);
+  --notion-active: rgba(255, 255, 255, 0.09);
+}
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  background: var(--notion-bg);
+  color: var(--notion-text);
+  font-family: ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica,
+    Arial, sans-serif;
+}
+
+.prose-notion {
+  font-size: 16px;
+  line-height: 1.5;
+  color: var(--notion-text);
+}
+
+.prose-notion p {
+  margin: 0.25rem 0;
+  min-height: 1.5em;
+}
+
+.prose-notion h1 {
+  font-size: 1.875rem;
+  font-weight: 700;
+  margin: 1.25rem 0 0.35rem;
+  line-height: 1.3;
+}
+
+.prose-notion h2 {
+  font-size: 1.5rem;
+  font-weight: 600;
+  margin: 1rem 0 0.25rem;
+  line-height: 1.3;
+}
+
+.prose-notion h3 {
+  font-size: 1.25rem;
+  font-weight: 600;
+  margin: 0.75rem 0 0.25rem;
+  line-height: 1.3;
+}
+
+.prose-notion ul,
+.prose-notion ol {
+  padding-left: 1.5rem;
+  margin: 0.25rem 0;
+}
+
+.prose-notion ul[data-type='taskList'] {
+  list-style: none;
+  padding-left: 0;
+}
+
+.prose-notion ul[data-type='taskList'] li {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.5rem;
+}
+
+.prose-notion ul[data-type='taskList'] li > label {
+  margin-top: 0.2rem;
+}
+
+.prose-notion pre {
+  background: var(--notion-hover);
+  border-radius: 4px;
+  padding: 0.75rem 1rem;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 0.875rem;
+  overflow-x: auto;
+  margin: 0.5rem 0;
+}
+
+.prose-notion code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 0.875em;
+}
+
+.prose-notion p.is-editor-empty:first-child::before {
+  color: color-mix(in srgb, var(--notion-text) 30%, transparent);
+  content: attr(data-placeholder);
+  float: left;
+  height: 0;
+  pointer-events: none;
+}
+
+.prose-notion blockquote {
+  border-left: 3px solid var(--notion-border);
+  padding-left: 1rem;
+  margin: 0.5rem 0;
+  color: color-mix(in srgb, var(--notion-text) 80%, transparent);
+}
+
+.prose-notion hr {
+  border: none;
+  border-top: 1px solid var(--notion-border);
+  margin: 1.25rem 0;
+}
+
+.prose-notion .editor-image,
+.prose-notion img {
+  max-width: 100%;
+  height: auto;
+  border-radius: 4px;
+  margin: 0.5rem 0;
+}
+
+.prose-notion .callout {
+  border-radius: 4px;
+  border: 1px solid var(--notion-border);
+  background: var(--notion-hover);
+  padding: 0.75rem 1rem;
+  margin: 0.5rem 0;
+}
+
+.prose-notion strong {
+  font-weight: 700;
+}
+
+.prose-notion em {
+  font-style: italic;
+}
+
+.prose-notion u {
+  text-decoration: underline;
+}
+
+.prose-notion s {
+  text-decoration: line-through;
+}
+
+.prose-notion code:not(pre code) {
+  background: var(--notion-hover);
+  border-radius: 3px;
+  padding: 0.1em 0.35em;
+  font-size: 0.9em;
+}
+
+.prose-notion .editor-link {
+  color: #2383e2;
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+.prose-notion .page-link {
+  display: inline-flex;
+  align-items: center;
+  border-radius: 4px;
+  background: var(--notion-active);
+  padding: 0 0.35rem;
+  color: var(--notion-text);
+  cursor: pointer;
+  font-weight: 500;
+}
+
+.prose-notion .page-link:hover {
+  text-decoration: underline;
+}
+
+.tippy-box {
+  background: transparent !important;
+  box-shadow: none !important;
+}
