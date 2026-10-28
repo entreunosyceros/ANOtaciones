@@ -8,17 +8,49 @@ import {
   type ReactNode,
 } from 'react'
 import {
+  addRevision,
+  createInboxTask as dbCreateInboxTask,
   createPage as dbCreatePage,
-  deletePageCascade,
+  createPageFromTemplate as dbCreateFromTemplate,
+  createTag as dbCreateTag,
+  deleteSavedView as dbDeleteSavedView,
+  deleteTag as dbDeleteTag,
   duplicatePage as dbDuplicatePage,
   ensureBootstrapPage,
+  getAllAttachments,
   getAllPages,
+  getAllSavedViews,
+  getAllTags,
   importPages,
+  listRevisions as dbListRevisions,
+  purgeTrash as dbPurgeTrash,
+  restorePages as dbRestorePages,
+  restoreRevision as dbRestoreRevision,
+  setPageTagIds as dbSetPageTagIds,
+  softDeletePageCascade,
+  syncPageLinkTitles,
   updatePage,
+  upsertSavedView as dbUpsertSavedView,
 } from '../db'
-import type { Page, PageKind, PageNode, PropertyValue, TipTapDoc } from '../db/types'
+import type {
+  AttachmentMeta,
+  Page,
+  PageKind,
+  PageNode,
+  PageRevision,
+  PropertyValue,
+  SavedView,
+  Tag,
+  TipTapDoc,
+} from '../db/types'
+import { isLivePage } from '../db/types'
+import { createId } from '../lib/id'
+import { repairOrphanParents } from '../lib/diagnostics'
+import type { ImportMode, ImportReport } from '../lib/backup'
+import { analyzeBackup } from '../lib/backup'
+import { rewritePageLinkTitles } from '../lib/pageLinks'
 import { pushRecentId, readRecentIds } from '../lib/recents'
-import { dailyNoteContent, findDailyNote, todayTitle } from '../lib/dailyNote'
+import { dailyNoteContent, findDailyNote, resolveDateTitle } from '../lib/dailyNote'
 import { buildTree } from '../lib/tree'
 import { isEmptyDoc } from '../lib/emptyDoc'
 
@@ -26,6 +58,10 @@ const ACTIVE_KEY = 'anotacion-active-page'
 
 interface PagesContextValue {
   pages: Page[]
+  allPages: Page[]
+  trashPages: Page[]
+  templates: Page[]
+  tags: Tag[]
   tree: PageNode[]
   favorites: Page[]
   recents: Page[]
@@ -42,48 +78,91 @@ interface PagesContextValue {
     open?: boolean
     content?: TipTapDoc
     icon?: string | null
+    isTemplate?: boolean
+    tagIds?: string[]
   }) => Promise<Page>
   deletePage: (id: string) => Promise<void>
+  restorePages: (ids: string[]) => Promise<void>
+  purgeTrash: (ids?: string[]) => Promise<void>
   renamePage: (id: string, title: string) => Promise<void>
   toggleFavorite: (id: string) => Promise<void>
   duplicatePage: (id: string) => Promise<Page | null>
-  openOrCreateDailyNote: () => Promise<Page>
-  importBackup: (pages: Page[]) => Promise<number>
+  createFromTemplate: (templateId: string) => Promise<Page | null>
+  markAsTemplate: (id: string, isTemplate: boolean) => Promise<void>
+  openOrCreateDailyNote: (date?: string | Date) => Promise<Page>
+  createDayTask: (input: { title: string; due: string }) => Promise<Page>
+  importBackup: (raw: unknown, mode?: ImportMode) => Promise<ImportReport>
+  createTag: (name: string) => Promise<Tag>
+  deleteTag: (id: string) => Promise<void>
+  setPageTags: (pageId: string, tagIds: string[]) => Promise<void>
   patchPage: (
     id: string,
     patch: Parameters<typeof updatePage>[1],
   ) => Promise<void>
   refresh: () => Promise<void>
+  savedViews: SavedView[]
+  attachments: AttachmentMeta[]
+  createInboxTask: (input: {
+    title: string
+    due?: string | null
+    priority?: 'low' | 'medium' | 'high' | null
+  }) => Promise<Page>
+  saveView: (view: Omit<SavedView, 'id' | 'createdAt' | 'updatedAt'> & { id?: string }) => Promise<SavedView>
+  deleteView: (id: string) => Promise<void>
+  listPageRevisions: (pageId: string) => Promise<PageRevision[]>
+  restorePageRevision: (revisionId: string) => Promise<void>
+  snapshotRevision: (pageId: string) => Promise<void>
+  repairOrphans: () => Promise<number>
 }
 
 const PagesContext = createContext<PagesContextValue | null>(null)
 
 function pickActiveId(pages: Page[], preferred: string | null): string | null {
-  if (preferred && pages.some((p) => p.id === preferred)) return preferred
-  const roots = pages.filter((p) => p.parentId === null).sort((a, b) => a.order - b.order)
-  return roots[0]?.id ?? pages[0]?.id ?? null
+  const live = pages.filter((p) => isLivePage(p) && !p.isTemplate)
+  if (preferred && live.some((p) => p.id === preferred)) return preferred
+  const roots = live.filter((p) => p.parentId === null).sort((a, b) => a.order - b.order)
+  return roots[0]?.id ?? live[0]?.id ?? null
 }
 
 export function PagesProvider({ children }: { children: ReactNode }) {
-  const [pages, setPages] = useState<Page[]>([])
+  const [allPages, setAllPages] = useState<Page[]>([])
+  const [tags, setTags] = useState<Tag[]>([])
+  const [savedViews, setSavedViews] = useState<SavedView[]>([])
+  const [attachments, setAttachments] = useState<AttachmentMeta[]>([])
   const [activePageId, setActivePageIdState] = useState<string | null>(null)
   const [recentIds, setRecentIds] = useState<string[]>(() => readRecentIds())
   const [loading, setLoading] = useState(true)
 
   const refresh = useCallback(async () => {
-    const all = await getAllPages()
-    setPages(all)
+    const [pagesRows, tagRows, viewRows, attRows] = await Promise.all([
+      getAllPages(),
+      getAllTags(),
+      getAllSavedViews(),
+      getAllAttachments(),
+    ])
+    setAllPages(pagesRows)
+    setTags(tagRows)
+    setSavedViews(viewRows)
+    setAttachments(attRows)
   }, [])
 
   useEffect(() => {
     let cancelled = false
     ;(async () => {
       await ensureBootstrapPage()
-      const all = await getAllPages()
+      const [pagesRows, tagRows, viewRows, attRows] = await Promise.all([
+        getAllPages(),
+        getAllTags(),
+        getAllSavedViews(),
+        getAllAttachments(),
+      ])
       if (cancelled) return
-      setPages(all)
+      setAllPages(pagesRows)
+      setTags(tagRows)
+      setSavedViews(viewRows)
+      setAttachments(attRows)
       const stored = localStorage.getItem(ACTIVE_KEY)
-      const next = pickActiveId(all, stored)
+      const next = pickActiveId(pagesRows, stored)
       setActivePageIdState(next)
       if (next) {
         localStorage.setItem(ACTIVE_KEY, next)
@@ -95,6 +174,22 @@ export function PagesProvider({ children }: { children: ReactNode }) {
       cancelled = true
     }
   }, [])
+
+  const pages = useMemo(
+    () => allPages.filter((p) => isLivePage(p) && !p.isTemplate),
+    [allPages],
+  )
+  const trashPages = useMemo(
+    () =>
+      allPages
+        .filter((p) => !isLivePage(p))
+        .sort((a, b) => (b.deletedAt ?? 0) - (a.deletedAt ?? 0)),
+    [allPages],
+  )
+  const templates = useMemo(
+    () => allPages.filter((p) => isLivePage(p) && !!p.isTemplate),
+    [allPages],
+  )
 
   const setActivePageId = useCallback((id: string) => {
     setActivePageIdState(id)
@@ -111,6 +206,8 @@ export function PagesProvider({ children }: { children: ReactNode }) {
       open?: boolean
       content?: TipTapDoc
       icon?: string | null
+      isTemplate?: boolean
+      tagIds?: string[]
     }) => {
       const { open = true, ...rest } = input
       const page = await dbCreatePage(rest)
@@ -123,15 +220,16 @@ export function PagesProvider({ children }: { children: ReactNode }) {
 
   const deletePage = useCallback(
     async (id: string) => {
-      const deleted = await deletePageCascade(id)
-      let all = await getAllPages()
-      if (all.length === 0) {
+      const deleted = await softDeletePageCascade(id)
+      let rows = await getAllPages()
+      const live = rows.filter((p) => isLivePage(p) && !p.isTemplate)
+      if (live.length === 0) {
         await ensureBootstrapPage()
-        all = await getAllPages()
+        rows = await getAllPages()
       }
-      setPages(all)
+      setAllPages(rows)
       if (activePageId && deleted.includes(activePageId)) {
-        const next = pickActiveId(all, null)
+        const next = pickActiveId(rows, null)
         setActivePageIdState(next)
         if (next) {
           localStorage.setItem(ACTIVE_KEY, next)
@@ -142,22 +240,48 @@ export function PagesProvider({ children }: { children: ReactNode }) {
     [activePageId],
   )
 
-  const renamePage = useCallback(
-    async (id: string, title: string) => {
-      await updatePage(id, { title })
+  const restorePages = useCallback(
+    async (ids: string[]) => {
+      await dbRestorePages(ids)
       await refresh()
     },
     [refresh],
   )
 
-  const toggleFavorite = useCallback(
-    async (id: string) => {
-      const page = pages.find((p) => p.id === id)
-      if (!page) return
-      await updatePage(id, { isFavorite: !page.isFavorite })
+  const purgeTrash = useCallback(
+    async (ids?: string[]) => {
+      await dbPurgeTrash(ids)
       await refresh()
     },
-    [pages, refresh],
+    [refresh],
+  )
+
+  const renamePage = useCallback(async (id: string, title: string) => {
+    setAllPages((prev) =>
+      prev.map((p) => {
+        if (p.id === id) return { ...p, title, updatedAt: Date.now() }
+        const nextContent = rewritePageLinkTitles(p.content, id, title)
+        if (nextContent === p.content) return p
+        return { ...p, content: nextContent }
+      }),
+    )
+    await updatePage(id, { title })
+    await syncPageLinkTitles(id, title)
+  }, [])
+
+  const toggleFavorite = useCallback(
+    async (id: string) => {
+      const page = allPages.find((p) => p.id === id)
+      if (!page) return
+      const nextFavorite = !page.isFavorite
+      setAllPages((prev) =>
+        prev.map((p) =>
+          p.id === id ? { ...p, isFavorite: nextFavorite, updatedAt: Date.now() } : p,
+        ),
+      )
+      await updatePage(id, { isFavorite: nextFavorite })
+    },
+    [allPages],
   )
 
   const duplicatePage = useCallback(
@@ -170,37 +294,193 @@ export function PagesProvider({ children }: { children: ReactNode }) {
     [refresh, setActivePageId],
   )
 
-  const openOrCreateDailyNote = useCallback(async () => {
-    const title = todayTitle()
-    const existing = findDailyNote(pages, title)
-    if (existing) {
-      setActivePageId(existing.id)
-      return existing
-    }
-    return createPage({
-      parentId: null,
-      title,
-      kind: 'doc',
-      icon: '📅',
-      content: dailyNoteContent(title),
-    })
-  }, [pages, createPage, setActivePageId])
-
-  const importBackup = useCallback(
-    async (incoming: Page[]) => {
-      const count = await importPages(incoming)
+  const createFromTemplate = useCallback(
+    async (templateId: string) => {
+      const page = await dbCreateFromTemplate(templateId)
       await refresh()
-      return count
+      if (page) setActivePageId(page.id)
+      return page
+    },
+    [refresh, setActivePageId],
+  )
+
+  const markAsTemplate = useCallback(
+    async (id: string, isTemplate: boolean) => {
+      await updatePage(id, { isTemplate })
+      await refresh()
     },
     [refresh],
   )
 
-  const patchPage = useCallback(
-    async (id: string, patch: Parameters<typeof updatePage>[1]) => {
-      await updatePage(id, patch)
+  const openOrCreateDailyNote = useCallback(
+    async (date?: string | Date) => {
+      const title = resolveDateTitle(date)
+      const existing = findDailyNote(pages, title)
+      if (existing) {
+        setActivePageId(existing.id)
+        return existing
+      }
+      return createPage({
+        parentId: null,
+        title,
+        kind: 'doc',
+        icon: '📅',
+        content: dailyNoteContent(title),
+      })
+    },
+    [pages, createPage, setActivePageId],
+  )
+
+  const createDayTask = useCallback(
+    async (input: { title: string; due: string }) => {
+      return createPage({
+        parentId: null,
+        title: input.title.trim() || 'Nueva tarea',
+        kind: 'doc',
+        icon: '✅',
+        properties: {
+          due: input.due.slice(0, 10),
+          status: 'Backlog',
+          inbox: false,
+        },
+        open: false,
+      })
+    },
+    [createPage],
+  )
+
+  const importBackup = useCallback(
+    async (raw: unknown, mode: ImportMode = 'merge') => {
+      const report = analyzeBackup(raw)
+      await importPages(report.accepted, {
+        mode,
+        tags: report.tags,
+        savedViews: report.savedViews,
+        attachments: report.attachments,
+      })
+      await refresh()
+      let rows = await getAllPages()
+      if (rows.filter((p) => isLivePage(p) && !p.isTemplate).length === 0) {
+        await ensureBootstrapPage()
+        rows = await getAllPages()
+        setAllPages(rows)
+      }
+      const next = pickActiveId(rows, activePageId)
+      if (next) setActivePageId(next)
+      return report
+    },
+    [refresh, activePageId, setActivePageId],
+  )
+
+  const createInboxTask = useCallback(
+    async (input: {
+      title: string
+      due?: string | null
+      priority?: 'low' | 'medium' | 'high' | null
+    }) => {
+      const page = await dbCreateInboxTask(input)
+      await refresh()
+      return page
+    },
+    [refresh],
+  )
+
+  const saveView = useCallback(
+    async (view: Omit<SavedView, 'id' | 'createdAt' | 'updatedAt'> & { id?: string }) => {
+      const now = Date.now()
+      const full: SavedView = {
+        id: view.id ?? createId(),
+        name: view.name,
+        scope: view.scope,
+        filter: view.filter,
+        sort: view.sort,
+        widgets: view.widgets,
+        createdAt: now,
+        updatedAt: now,
+      }
+      await dbUpsertSavedView(full)
+      await refresh()
+      return full
+    },
+    [refresh],
+  )
+
+  const deleteView = useCallback(
+    async (id: string) => {
+      await dbDeleteSavedView(id)
       await refresh()
     },
     [refresh],
+  )
+
+  const listPageRevisions = useCallback(async (pageId: string) => dbListRevisions(pageId), [])
+
+  const restorePageRevision = useCallback(
+    async (revisionId: string) => {
+      await dbRestoreRevision(revisionId)
+      await refresh()
+    },
+    [refresh],
+  )
+
+  const snapshotRevision = useCallback(
+    async (pageId: string) => {
+      const page = allPages.find((p) => p.id === pageId)
+      if (!page) return
+      await addRevision(page)
+    },
+    [allPages],
+  )
+
+  const repairOrphans = useCallback(async () => {
+    const repaired = repairOrphanParents(allPages)
+    let n = 0
+    for (const p of repaired) {
+      const orig = allPages.find((x) => x.id === p.id)
+      if (orig && orig.parentId !== p.parentId) {
+        await updatePage(p.id, { parentId: null })
+        n++
+      }
+    }
+    await refresh()
+    return n
+  }, [allPages, refresh])
+
+  const createTag = useCallback(
+    async (name: string) => {
+      const tag = await dbCreateTag(name)
+      await refresh()
+      return tag
+    },
+    [refresh],
+  )
+
+  const deleteTag = useCallback(
+    async (id: string) => {
+      await dbDeleteTag(id)
+      await refresh()
+    },
+    [refresh],
+  )
+
+  const setPageTags = useCallback(
+    async (pageId: string, tagIds: string[]) => {
+      setAllPages((prev) =>
+        prev.map((p) => (p.id === pageId ? { ...p, tagIds, updatedAt: Date.now() } : p)),
+      )
+      await dbSetPageTagIds(pageId, tagIds)
+    },
+    [],
+  )
+
+  const patchPage = useCallback(
+    async (id: string, patch: Parameters<typeof updatePage>[1]) => {
+      setAllPages((prev) =>
+        prev.map((p) => (p.id === id ? { ...p, ...patch, updatedAt: Date.now() } : p)),
+      )
+      await updatePage(id, patch)
+    },
+    [],
   )
 
   const tree = useMemo(() => buildTree(pages), [pages])
@@ -213,8 +493,8 @@ export function PagesProvider({ children }: { children: ReactNode }) {
     return recentIds.map((id) => byId.get(id)).filter((p): p is Page => !!p)
   }, [pages, recentIds])
   const activePage = useMemo(
-    () => pages.find((p) => p.id === activePageId) ?? null,
-    [pages, activePageId],
+    () => allPages.find((p) => p.id === activePageId && isLivePage(p)) ?? null,
+    [allPages, activePageId],
   )
   const showWelcome = useMemo(() => {
     if (pages.length !== 1) return false
@@ -230,6 +510,10 @@ export function PagesProvider({ children }: { children: ReactNode }) {
   const value = useMemo<PagesContextValue>(
     () => ({
       pages,
+      allPages,
+      trashPages,
+      templates,
+      tags,
       tree,
       favorites,
       recents,
@@ -240,16 +524,37 @@ export function PagesProvider({ children }: { children: ReactNode }) {
       setActivePageId,
       createPage,
       deletePage,
+      restorePages,
+      purgeTrash,
       renamePage,
       toggleFavorite,
       duplicatePage,
+      createFromTemplate,
+      markAsTemplate,
       openOrCreateDailyNote,
+      createDayTask,
       importBackup,
+      createTag,
+      deleteTag,
+      setPageTags,
       patchPage,
       refresh,
+      savedViews,
+      attachments,
+      createInboxTask,
+      saveView,
+      deleteView,
+      listPageRevisions,
+      restorePageRevision,
+      snapshotRevision,
+      repairOrphans,
     }),
     [
       pages,
+      allPages,
+      trashPages,
+      templates,
+      tags,
       tree,
       favorites,
       recents,
@@ -260,13 +565,30 @@ export function PagesProvider({ children }: { children: ReactNode }) {
       setActivePageId,
       createPage,
       deletePage,
+      restorePages,
+      purgeTrash,
       renamePage,
       toggleFavorite,
       duplicatePage,
+      createFromTemplate,
+      markAsTemplate,
       openOrCreateDailyNote,
+      createDayTask,
       importBackup,
+      createTag,
+      deleteTag,
+      setPageTags,
       patchPage,
       refresh,
+      savedViews,
+      attachments,
+      createInboxTask,
+      saveView,
+      deleteView,
+      listPageRevisions,
+      restorePageRevision,
+      snapshotRevision,
+      repairOrphans,
     ],
   )
 

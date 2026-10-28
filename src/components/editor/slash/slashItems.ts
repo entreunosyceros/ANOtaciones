@@ -79,4 +79,22 @@ export const slashItems: SlashItem[] = [
       editor.chain().focus().setImage({ src: url.trim() }).run()
     },
   },
+  {
+    title: 'Enlace a página',
+    description: 'Insertar enlace interno por título',
+    command: (editor) => {
+      const title = window.prompt('Título de la página a enlazar')?.trim()
+      if (!title) return
+      const ext = editor.extensionManager.extensions.find((e) => e.name === 'pageLink')
+      const resolve = (
+        ext?.options as { resolvePageId?: (t: string) => string | null } | undefined
+      )?.resolvePageId
+      const pageId = resolve?.(title) ?? null
+      if (!pageId) {
+        window.alert('No hay ninguna página con ese título exacto.')
+        return
+      }
+      editor.chain().focus().insertPageLink({ pageId, title }).run()
+    },
+  },
 ]

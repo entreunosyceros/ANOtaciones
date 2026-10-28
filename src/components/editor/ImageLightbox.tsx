@@ -29,6 +29,7 @@ export function ImageLightbox({
     >
       <button
         type="button"
+        title="Cerrar (Esc)"
         aria-label="Cerrar"
         className="absolute right-4 top-4 rounded-full bg-black/50 p-2 text-white hover:bg-black/70"
         onClick={onClose}

@@ -1,17 +1,11 @@
-import { Columns3, Database, FileText } from 'lucide-react'
 import { usePagesContext } from '../../context/PagesContext'
-import type { Page } from '../../db/types'
+import { Tooltip } from '../ui/Tooltip'
+import { PageGlyph } from './pageGlyph'
 import { PageItem } from './PageItem'
 
-function PageGlyph({ page }: { page: Page }) {
-  if (page.icon) return <span className="text-base leading-none">{page.icon}</span>
-  if (page.kind === 'board') return <Columns3 className="size-4 opacity-60" />
-  if (page.kind === 'database') return <Database className="size-4 opacity-60" />
-  return <FileText className="size-4 opacity-60" />
-}
-
 export function PageTree({ collapsed = false }: { collapsed?: boolean }) {
-  const { tree, favorites, recents, pages, setActivePageId, activePageId } = usePagesContext()
+  const { tree, favorites, recents, pages, templates, setActivePageId, activePageId } =
+    usePagesContext()
 
   if (collapsed) {
     const rail = [
@@ -25,20 +19,23 @@ export function PageTree({ collapsed = false }: { collapsed?: boolean }) {
 
     return (
       <nav className="flex flex-col items-center gap-0.5 px-1" aria-label="Páginas">
-        {ordered.map((page) => (
-          <button
-            key={page.id}
-            type="button"
-            title={page.title || 'Sin título'}
-            aria-label={page.title || 'Sin título'}
-            onClick={() => setActivePageId(page.id)}
-            className={`flex size-9 items-center justify-center rounded-md ${
-              activePageId === page.id ? 'bg-notion-active' : 'hover:bg-notion-hover'
-            }`}
-          >
-            <PageGlyph page={page} />
-          </button>
-        ))}
+        {ordered.map((page) => {
+          const label = page.title || 'Sin título'
+          return (
+            <Tooltip key={page.id} content={`Abrir «${label}»`} side="right">
+              <button
+                type="button"
+                aria-label={`Abrir «${label}»`}
+                onClick={() => setActivePageId(page.id)}
+                className={`flex size-9 items-center justify-center rounded-md ${
+                  activePageId === page.id ? 'bg-notion-active' : 'hover:bg-notion-hover'
+                }`}
+              >
+                <PageGlyph page={page} />
+              </button>
+            </Tooltip>
+          )
+        })}
       </nav>
     )
   }
@@ -51,19 +48,24 @@ export function PageTree({ collapsed = false }: { collapsed?: boolean }) {
             Favoritos
           </p>
           <div className="flex flex-col gap-0.5 px-1">
-            {favorites.map((page) => (
-              <button
-                key={page.id}
-                type="button"
-                onClick={() => setActivePageId(page.id)}
-                className={`truncate rounded-md px-2 py-1 text-left text-sm ${
-                  activePageId === page.id ? 'bg-notion-active' : 'hover:bg-notion-hover'
-                }`}
-              >
-                {page.icon ? `${page.icon} ` : ''}
-                {page.title || 'Sin título'}
-              </button>
-            ))}
+            {favorites.map((page) => {
+              const label = page.title || 'Sin título'
+              return (
+                <button
+                  key={page.id}
+                  type="button"
+                  title={`Abrir favorito «${label}»`}
+                  aria-label={`Abrir favorito «${label}»`}
+                  onClick={() => setActivePageId(page.id)}
+                  className={`truncate rounded-md px-2 py-1 text-left text-sm ${
+                    activePageId === page.id ? 'bg-notion-active' : 'hover:bg-notion-hover'
+                  }`}
+                >
+                  {page.icon ? `${page.icon} ` : ''}
+                  {label}
+                </button>
+              )
+            })}
           </div>
         </div>
       )}
@@ -74,19 +76,24 @@ export function PageTree({ collapsed = false }: { collapsed?: boolean }) {
             Recientes
           </p>
           <div className="flex flex-col gap-0.5 px-1">
-            {recents.map((page) => (
-              <button
-                key={`recent-${page.id}`}
-                type="button"
-                onClick={() => setActivePageId(page.id)}
-                className={`truncate rounded-md px-2 py-1 text-left text-sm ${
-                  activePageId === page.id ? 'bg-notion-active' : 'hover:bg-notion-hover'
-                }`}
-              >
-                {page.icon ? `${page.icon} ` : ''}
-                {page.title || 'Sin título'}
-              </button>
-            ))}
+            {recents.map((page) => {
+              const label = page.title || 'Sin título'
+              return (
+                <button
+                  key={`recent-${page.id}`}
+                  type="button"
+                  title={`Abrir reciente «${label}»`}
+                  aria-label={`Abrir reciente «${label}»`}
+                  onClick={() => setActivePageId(page.id)}
+                  className={`truncate rounded-md px-2 py-1 text-left text-sm ${
+                    activePageId === page.id ? 'bg-notion-active' : 'hover:bg-notion-hover'
+                  }`}
+                >
+                  {page.icon ? `${page.icon} ` : ''}
+                  {label}
+                </button>
+              )
+            })}
           </div>
         </div>
       )}
@@ -101,6 +108,34 @@ export function PageTree({ collapsed = false }: { collapsed?: boolean }) {
           ))}
         </nav>
       </div>
+
+      {templates.length > 0 && (
+        <div>
+          <p className="px-3 pb-1 text-[11px] font-medium uppercase tracking-wide text-notion-text/40">
+            Plantillas
+          </p>
+          <div className="flex flex-col gap-0.5 px-1">
+            {templates.map((page) => {
+              const label = page.title || 'Sin título'
+              return (
+                <button
+                  key={`tpl-${page.id}`}
+                  type="button"
+                  title={`Editar plantilla «${label}»`}
+                  aria-label={`Editar plantilla «${label}»`}
+                  onClick={() => setActivePageId(page.id)}
+                  className={`truncate rounded-md px-2 py-1 text-left text-sm ${
+                    activePageId === page.id ? 'bg-notion-active' : 'hover:bg-notion-hover'
+                  }`}
+                >
+                  {page.icon ? `${page.icon} ` : ''}
+                  {label}
+                </button>
+              )
+            })}
+          </div>
+        </div>
+      )}
     </div>
   )
 }

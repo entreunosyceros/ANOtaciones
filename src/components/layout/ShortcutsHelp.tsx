@@ -1,5 +1,6 @@
 import { Keyboard } from 'lucide-react'
 import { useEffect, useState } from 'react'
+import { Tooltip } from '../ui/Tooltip'
 
 const isMac =
   typeof navigator !== 'undefined' && /Mac|iPhone|iPad/.test(navigator.platform)
@@ -49,7 +50,7 @@ const SECTIONS: { title: string; shortcuts: { keys: string; desc: string }[] }[]
   },
 ]
 
-export function ShortcutsHelp() {
+export function ShortcutsHelp({ tipSide = 'bottom' }: { tipSide?: 'top' | 'bottom' | 'left' | 'right' }) {
   const [open, setOpen] = useState(false)
 
   useEffect(() => {
@@ -83,15 +84,16 @@ export function ShortcutsHelp() {
 
   return (
     <>
-      <button
-        type="button"
-        aria-label="Atajos de teclado (?)"
-        title="Atajos de teclado (?)"
-        className="flex size-9 items-center justify-center rounded-md p-1.5 text-notion-text/70 hover:bg-notion-hover"
-        onClick={() => setOpen(true)}
-      >
-        <Keyboard className="size-4" />
-      </button>
+      <Tooltip content="Ver atajos de teclado (?)" side={tipSide}>
+        <button
+          type="button"
+          aria-label="Ver atajos de teclado (?)"
+          className="flex size-9 items-center justify-center rounded-md p-1.5 text-notion-text/70 hover:bg-notion-hover"
+          onClick={() => setOpen(true)}
+        >
+          <Keyboard className="size-4" />
+        </button>
+      </Tooltip>
 
       {open && (
         <div

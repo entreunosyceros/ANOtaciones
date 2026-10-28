@@ -1,4 +1,4 @@
-import { forwardRef, useEffect, useImperativeHandle, useState } from 'react'
+import { forwardRef, useImperativeHandle, useState } from 'react'
 import type { SlashItem } from './slashItems'
 
 export interface SlashListRef {
@@ -10,8 +10,13 @@ export const SlashList = forwardRef<
   { items: SlashItem[]; command: (item: SlashItem) => void }
 >(function SlashList({ items, command }, ref) {
   const [selected, setSelected] = useState(0)
-
-  useEffect(() => setSelected(0), [items])
+  const [itemsKey, setItemsKey] = useState(() => items.map((i) => i.title).join('|'))
+  const nextKey = items.map((i) => i.title).join('|')
+  if (nextKey !== itemsKey) {
+    setItemsKey(nextKey)
+    setSelected(0)
+  }
+  const safeSelected = items.length ? Math.min(selected, items.length - 1) : 0
 
   useImperativeHandle(ref, () => ({
     onKeyDown: ({ event }) => {
@@ -24,7 +29,7 @@ export const SlashList = forwardRef<
         return true
       }
       if (event.key === 'Enter') {
-        const item = items[selected]
+        const item = items[safeSelected]
         if (item) command(item)
         return true
       }
@@ -47,7 +52,7 @@ export const SlashList = forwardRef<
           key={item.title}
           type="button"
           className={`flex w-full flex-col rounded px-2 py-1.5 text-left text-sm ${
-            index === selected ? 'bg-notion-active' : 'hover:bg-notion-hover'
+            index === safeSelected ? 'bg-notion-active' : 'hover:bg-notion-hover'
           }`}
           onClick={() => command(item)}
         >

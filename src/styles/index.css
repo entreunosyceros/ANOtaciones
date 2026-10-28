@@ -193,6 +193,14 @@ body {
   text-decoration: underline;
 }
 
+.prose-notion .page-link--broken {
+  background: transparent;
+  color: var(--notion-text);
+  opacity: 0.45;
+  text-decoration: line-through;
+  cursor: not-allowed;
+}
+
 .tippy-box {
   background: transparent !important;
   box-shadow: none !important;

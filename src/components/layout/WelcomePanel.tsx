@@ -26,6 +26,7 @@ export function WelcomePanel() {
       <div className="grid w-full gap-2 sm:grid-cols-2">
         <button
           type="button"
+          title="Empezar con una nota de texto"
           onClick={() => void startOnBootstrap()}
           className="flex items-center gap-2 rounded-lg border border-notion-border px-4 py-3 text-left text-sm hover:bg-notion-hover"
         >
@@ -34,6 +35,7 @@ export function WelcomePanel() {
         </button>
         <button
           type="button"
+          title="Abrir o crear la nota con la fecha de hoy"
           onClick={() => void openOrCreateDailyNote()}
           className="flex items-center gap-2 rounded-lg border border-notion-border px-4 py-3 text-left text-sm hover:bg-notion-hover"
         >
@@ -42,6 +44,7 @@ export function WelcomePanel() {
         </button>
         <button
           type="button"
+          title="Crear un tablero Kanban para tareas"
           onClick={() => void createPage({ parentId: null, kind: 'board' })}
           className="flex items-center gap-2 rounded-lg border border-notion-border px-4 py-3 text-left text-sm hover:bg-notion-hover"
         >
@@ -50,6 +53,7 @@ export function WelcomePanel() {
         </button>
         <button
           type="button"
+          title="Crear una base de datos con vistas"
           onClick={() => void createPage({ parentId: null, kind: 'database' })}
           className="flex items-center gap-2 rounded-lg border border-notion-border px-4 py-3 text-left text-sm hover:bg-notion-hover"
         >

@@ -1,10 +1,17 @@
 import type { Page, TipTapDoc } from '../db/types'
+import { toIsoDate } from './dates'
+
+/** Normalize Date or YYYY-MM-DD string to calendar title (ISO interno). */
+export function resolveDateTitle(date?: string | Date): string {
+  if (typeof date === 'string' && /^\d{4}-\d{2}-\d{2}/.test(date)) {
+    return date.slice(0, 10)
+  }
+  const d = date instanceof Date ? date : new Date()
+  return todayTitle(d)
+}
 
 export function todayTitle(date = new Date()): string {
-  const y = date.getFullYear()
-  const m = String(date.getMonth() + 1).padStart(2, '0')
-  const d = String(date.getDate()).padStart(2, '0')
-  return `${y}-${m}-${d}`
+  return toIsoDate(date)
 }
 
 export function dailyNoteContent(title: string): TipTapDoc {

@@ -10,38 +10,55 @@ import StarterKit from '@tiptap/starter-kit'
 import { FileText, Star } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import { usePagesContext } from '../../context/PagesContext'
-import { DEFAULT_TITLE } from '../../lib/constants'
 import type { Page } from '../../db/types'
 import { useAutosave } from '../../hooks/useAutosave'
+import { storeAttachment } from '../../lib/attachments'
+import { DEFAULT_TITLE } from '../../lib/constants'
 import { Breadcrumbs } from '../layout/Breadcrumbs'
 import { PageIconButton } from '../ui/EmojiPicker'
+import { Tooltip } from '../ui/Tooltip'
+import { BacklinksPanel } from './BacklinksPanel'
 import { EditorBubbleMenu } from './EditorBubbleMenu'
 import { ImageLightbox } from './ImageLightbox'
+import { PageTags } from './PageTags'
+import { RevisionHistory } from './RevisionHistory'
+import { TaskMetaBar } from './TaskMetaBar'
 import { Callout } from './extensions/Callout'
 import { PageLink } from './extensions/PageLink'
 import { SlashCommand } from './slash/SlashCommand'
 
-function readFileAsDataUrl(file: File): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader()
-    reader.onload = () => resolve(String(reader.result))
-    reader.onerror = () => reject(reader.error)
-    reader.readAsDataURL(file)
-  })
+async function fileToEditorSrc(pageId: string, file: File): Promise<string> {
+  try {
+    const { url } = await storeAttachment(pageId, file)
+    return url
+  } catch {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader()
+      reader.onload = () => resolve(String(reader.result))
+      reader.onerror = () => reject(reader.error)
+      reader.readAsDataURL(file)
+    })
+  }
 }
 
 export function BlockEditor({ page }: { page: Page }) {
-  const { pages, renamePage, setActivePageId, toggleFavorite, patchPage } = usePagesContext()
+  const {
+    allPages,
+    renamePage,
+    setActivePageId,
+    toggleFavorite,
+    patchPage,
+    markAsTemplate,
+    snapshotRevision,
+  } = usePagesContext()
   const { schedule, flush } = useAutosave(page.id)
-  const titleRef = useRef(page.title)
-  const pagesRef = useRef(pages)
+  const pagesRef = useRef(allPages)
   const editorRef = useRef<Editor | null>(null)
   const [lightboxSrc, setLightboxSrc] = useState<string | null>(null)
-  pagesRef.current = pages
 
   useEffect(() => {
-    titleRef.current = page.title
-  }, [page.title])
+    pagesRef.current = allPages
+  }, [allPages])
 
   const editor = useEditor(
     {
@@ -69,9 +86,19 @@ export function BlockEditor({ page }: { page: Page }) {
         PageLink.configure({
           resolvePageId: (title) => {
             const match = pagesRef.current.find(
-              (p) => p.title.toLowerCase() === title.toLowerCase(),
+              (p) =>
+                !p.deletedAt &&
+                !p.isTemplate &&
+                p.title.toLowerCase() === title.toLowerCase(),
             )
             return match?.id ?? null
+          },
+          getPageMeta: (pageId) => {
+            const match = pagesRef.current.find((p) => p.id === pageId)
+            if (!match || match.deletedAt) {
+              return { title: 'página eliminada', exists: false }
+            }
+            return { title: match.title || 'Sin título', exists: true }
           },
           onNavigate: (pageId) => setActivePageId(pageId),
         }),
@@ -90,7 +117,7 @@ export function BlockEditor({ page }: { page: Page }) {
               const file = item.getAsFile()
               if (!file) continue
               event.preventDefault()
-              void readFileAsDataUrl(file).then((src) => {
+              void fileToEditorSrc(page.id, file).then((src) => {
                 editorRef.current?.chain().focus().setImage({ src }).run()
               })
               return true
@@ -104,7 +131,7 @@ export function BlockEditor({ page }: { page: Page }) {
           const file = files[0]
           if (!file.type.startsWith('image/')) return false
           event.preventDefault()
-          void readFileAsDataUrl(file).then((src) => {
+          void fileToEditorSrc(page.id, file).then((src) => {
             editorRef.current?.chain().focus().setImage({ src }).run()
           })
           return true
@@ -113,11 +140,16 @@ export function BlockEditor({ page }: { page: Page }) {
       onUpdate: ({ editor: ed }) => {
         schedule(ed.getJSON())
       },
+      onBlur: () => {
+        void snapshotRevision(page.id)
+      },
     },
     [page.id],
   )
 
-  editorRef.current = editor
+  useEffect(() => {
+    editorRef.current = editor
+  }, [editor])
 
   useEffect(() => {
     return () => {
@@ -141,21 +173,40 @@ export function BlockEditor({ page }: { page: Page }) {
           placeholder={DEFAULT_TITLE}
           className="min-w-0 flex-1 border-none bg-transparent text-[40px] font-bold leading-tight text-notion-text outline-none placeholder:text-notion-text/25"
           onChange={(e) => {
-            titleRef.current = e.target.value
             void renamePage(page.id, e.target.value || DEFAULT_TITLE)
           }}
         />
-        <button
-          type="button"
-          aria-label={page.isFavorite ? 'Quitar de favoritos' : 'Añadir a favoritos'}
-          className="mt-3 rounded-md p-1.5 text-notion-text/50 hover:bg-notion-hover hover:text-notion-text"
-          onClick={() => void toggleFavorite(page.id)}
+        <RevisionHistory pageId={page.id} />
+        <Tooltip
+          content={page.isTemplate ? 'Quitar de plantillas' : 'Marcar como plantilla'}
         >
-          <Star
-            className={`size-5 ${page.isFavorite ? 'fill-amber-400 text-amber-400' : ''}`}
-          />
-        </button>
+          <button
+            type="button"
+            aria-label={page.isTemplate ? 'Quitar de plantillas' : 'Marcar como plantilla'}
+            title={page.isTemplate ? 'Quitar de plantillas' : 'Marcar como plantilla'}
+            className={`mt-3 rounded-md px-2 py-1 text-[11px] hover:bg-notion-hover ${
+              page.isTemplate ? 'bg-notion-active text-notion-text' : 'text-notion-text/50'
+            }`}
+            onClick={() => void markAsTemplate(page.id, !page.isTemplate)}
+          >
+            Plantilla
+          </button>
+        </Tooltip>
+        <Tooltip content={page.isFavorite ? 'Quitar de favoritos' : 'Añadir a favoritos'}>
+          <button
+            type="button"
+            aria-label={page.isFavorite ? 'Quitar de favoritos' : 'Añadir a favoritos'}
+            className="mt-3 rounded-md p-1.5 text-notion-text/50 hover:bg-notion-hover hover:text-notion-text"
+            onClick={() => void toggleFavorite(page.id)}
+          >
+            <Star
+              className={`size-5 ${page.isFavorite ? 'fill-amber-400 text-amber-400' : ''}`}
+            />
+          </button>
+        </Tooltip>
       </div>
+      <TaskMetaBar page={page} />
+      <PageTags page={page} />
       {editor && <EditorBubbleMenu editor={editor} />}
       <div
         onDoubleClick={(e) => {
@@ -168,6 +219,7 @@ export function BlockEditor({ page }: { page: Page }) {
       >
         <EditorContent editor={editor} />
       </div>
+      <BacklinksPanel pageId={page.id} />
       <ImageLightbox src={lightboxSrc} onClose={() => setLightboxSrc(null)} />
     </div>
   )

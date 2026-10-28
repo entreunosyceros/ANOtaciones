@@ -47,6 +47,8 @@ function SortableCard({
       ref={setNodeRef}
       style={style}
       type="button"
+      title={`Abrir «${page.title || 'Sin título'}» (arrastra para mover)`}
+      aria-label={`Abrir «${page.title || 'Sin título'}»`}
       className="w-full rounded-md border border-notion-border bg-notion-bg px-3 py-2 text-left text-sm shadow-sm hover:bg-notion-hover"
       onClick={onOpen}
       {...attributes}
@@ -176,7 +178,8 @@ export function KanbanBoard({ page, embedded = false }: { page: Page; embedded?:
             />
             <button
               type="button"
-              aria-label="Favorito"
+              title={page.isFavorite ? 'Quitar de favoritos' : 'Añadir a favoritos'}
+              aria-label={page.isFavorite ? 'Quitar de favoritos' : 'Añadir a favoritos'}
               className="rounded-md p-1.5 hover:bg-notion-hover"
               onClick={() => void toggleFavorite(page.id)}
             >
@@ -186,6 +189,8 @@ export function KanbanBoard({ page, embedded = false }: { page: Page; embedded?:
             </button>
             <button
               type="button"
+              title="Añadir una tarjeta al Backlog"
+              aria-label="Añadir una tarjeta al Backlog"
               className="flex items-center gap-1 rounded-md border border-notion-border px-3 py-1.5 text-sm hover:bg-notion-hover"
               onClick={addCard}
             >
@@ -200,6 +205,8 @@ export function KanbanBoard({ page, embedded = false }: { page: Page; embedded?:
         <div className="mb-3">
           <button
             type="button"
+            title="Añadir una tarjeta al Backlog"
+            aria-label="Añadir una tarjeta al Backlog"
             className="flex items-center gap-1 rounded-md border border-notion-border px-3 py-1.5 text-sm hover:bg-notion-hover"
             onClick={addCard}
           >

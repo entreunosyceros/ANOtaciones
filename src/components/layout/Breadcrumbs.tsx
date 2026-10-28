@@ -20,6 +20,8 @@ export function Breadcrumbs({ pageId }: { pageId: string }) {
             ) : (
               <button
                 type="button"
+                title={`Ir a «${page.title || 'Sin título'}»`}
+                aria-label={`Ir a «${page.title || 'Sin título'}»`}
                 className="hover:text-notion-text"
                 onClick={() => setActivePageId(page.id)}
               >

@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react'
+import { Tooltip } from './Tooltip'
 
 const EMOJIS = [
   '📝', '📒', '📚', '💡', '⭐', '🔥', '🎯', '🚀',
@@ -77,14 +78,16 @@ export function PageIconButton({
 
   return (
     <div className="relative shrink-0">
-      <button
-        type="button"
-        aria-label="Cambiar icono"
-        className="flex size-10 items-center justify-center rounded-md text-2xl hover:bg-notion-hover"
-        onClick={() => setOpen((v) => !v)}
-      >
-        {icon ? <span>{icon}</span> : fallback}
-      </button>
+      <Tooltip content="Cambiar icono de la página">
+        <button
+          type="button"
+          aria-label="Cambiar icono de la página"
+          className="flex size-10 items-center justify-center rounded-md text-2xl hover:bg-notion-hover"
+          onClick={() => setOpen((v) => !v)}
+        >
+          {icon ? <span>{icon}</span> : fallback}
+        </button>
+      </Tooltip>
       {open && (
         <EmojiPicker value={icon} onChange={onChange} onClose={() => setOpen(false)} />
       )}

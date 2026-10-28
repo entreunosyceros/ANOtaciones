@@ -30,6 +30,7 @@ export function AboutModal({ open, onClose }: { open: boolean; onClose: () => vo
       >
         <button
           type="button"
+          title="Cerrar"
           aria-label="Cerrar"
           className="absolute right-3 top-3 rounded-md p-1 text-notion-text/50 hover:bg-notion-hover hover:text-notion-text"
           onClick={onClose}

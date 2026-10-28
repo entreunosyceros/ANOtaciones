@@ -2,6 +2,8 @@ import { InputRule, mergeAttributes, Node } from '@tiptap/react'
 
 export interface PageLinkOptions {
   resolvePageId: (title: string) => string | null
+  /** Live title + existence for render / broken state */
+  getPageMeta: (pageId: string) => { title: string; exists: boolean } | null
   onNavigate: (pageId: string) => void
 }
 
@@ -22,6 +24,7 @@ export const PageLink = Node.create<PageLinkOptions>({
   addOptions() {
     return {
       resolvePageId: () => null,
+      getPageMeta: () => null,
       onNavigate: () => undefined,
     }
   },
@@ -82,23 +85,36 @@ export const PageLink = Node.create<PageLinkOptions>({
   addNodeView() {
     return ({ node, editor }) => {
       const dom = document.createElement('span')
-      dom.className = 'page-link'
       dom.dataset.type = 'page-link'
-      dom.textContent = node.attrs.title || 'página'
       dom.contentEditable = 'false'
+
+      const paint = (pageId: string | null, fallbackTitle: string) => {
+        const meta = pageId ? this.options.getPageMeta(pageId) : null
+        const exists = meta?.exists ?? false
+        const label = meta?.title || fallbackTitle || 'página'
+        dom.className = exists ? 'page-link' : 'page-link page-link--broken'
+        dom.textContent = exists ? label : `${label} (roto)`
+        dom.title = exists ? `Ir a «${label}»` : 'Enlace a página inexistente'
+      }
+
+      paint(node.attrs.pageId, node.attrs.title || '')
+
       dom.addEventListener('click', (e) => {
         e.preventDefault()
         e.stopPropagation()
-        if (node.attrs.pageId) {
-          this.options.onNavigate(node.attrs.pageId)
-          editor.commands.blur()
-        }
+        const pageId = node.attrs.pageId as string | null
+        if (!pageId) return
+        const meta = this.options.getPageMeta(pageId)
+        if (!meta?.exists) return
+        this.options.onNavigate(pageId)
+        editor.commands.blur()
       })
+
       return {
         dom,
         update: (updated) => {
           if (updated.type !== node.type) return false
-          dom.textContent = updated.attrs.title || 'página'
+          paint(updated.attrs.pageId, updated.attrs.title || '')
           return true
         },
       }

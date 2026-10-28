@@ -1,10 +1,15 @@
 import { Plus, Star, Table2, LayoutGrid, Columns3, Database } from 'lucide-react'
-import { useMemo } from 'react'
+import { useMemo, useState } from 'react'
 import { createId } from '../../lib/id'
+import { applyDbView } from '../../lib/dbFilters'
+import { evaluateFormula } from '../../lib/formulaGraph'
+import { formatDateEs } from '../../lib/dates'
+import { coercePropertyValue, displayPropertyValue, emptyValueForType } from '../../lib/propertyTypes'
 import { usePagesContext } from '../../context/PagesContext'
 import {
   BOARD_STATUSES,
   type DbProperty,
+  type DbPropertyType,
   type DbViewType,
   type Page,
   type PropertyValue,
@@ -13,22 +18,24 @@ import { Breadcrumbs } from '../layout/Breadcrumbs'
 import { KanbanBoard } from '../board/KanbanBoard'
 import { PageIconButton } from '../ui/EmojiPicker'
 
-function propValue(page: Page, key: string): string {
-  const v = page.properties[key]
-  if (v == null) return ''
-  return String(v)
+function propValue(page: Page, key: string, type?: string): string {
+  const v = page.properties[key] ?? null
+  if (type === 'date' && typeof v === 'string') return formatDateEs(v) || '—'
+  return displayPropertyValue(v)
 }
 
 export function DatabaseView({ page }: { page: Page }) {
   const { pages, createPage, patchPage, renamePage, setActivePageId, toggleFavorite } =
     usePagesContext()
+  const [filterText, setFilterText] = useState('')
+  const [sortProp, setSortProp] = useState<string>('')
 
   const schema = page.dbSchema ?? []
   const views = page.dbViews ?? []
   const activeView = views.find((v) => v.id === page.activeViewId) ?? views[0]
   const viewType: DbViewType = activeView?.type ?? 'table'
 
-  const rows = useMemo(
+  const rawRows = useMemo(
     () =>
       pages
         .filter((p) => p.parentId === page.id)
@@ -36,15 +43,44 @@ export function DatabaseView({ page }: { page: Page }) {
     [pages, page.id],
   )
 
+  const { rows, groups } = useMemo(() => {
+    const filters = filterText.trim()
+      ? {
+          op: 'or' as const,
+          conditions: schema.map((col) => ({
+            propId: col.id,
+            op: 'contains' as const,
+            value: filterText.trim(),
+          })),
+        }
+      : activeView?.filters ?? null
+    const sorts =
+      sortProp
+        ? [{ propId: sortProp, dir: 'asc' as const }]
+        : activeView?.sorts ?? []
+    return applyDbView(rawRows, {
+      filters,
+      sorts,
+      groupBy: activeView?.groupBy ?? null,
+    })
+  }, [rawRows, filterText, schema, activeView, sortProp])
+
   const setView = (viewId: string) => {
     void patchPage(page.id, { activeViewId: viewId })
   }
 
   const addProperty = () => {
+    const type = window.prompt(
+      'Tipo: text | select | number | checkbox | date | multi_select | relation | formula',
+      'text',
+    ) as DbPropertyType | null
+    if (!type) return
     const next: DbProperty = {
       id: createId(),
       name: 'Nueva propiedad',
-      type: 'text',
+      type,
+      options: type === 'select' || type === 'multi_select' ? ['A', 'B'] : [],
+      formula: type === 'formula' ? 'prop("Name")' : undefined,
     }
     void patchPage(page.id, { dbSchema: [...schema, next] })
   }
@@ -54,12 +90,8 @@ export function DatabaseView({ page }: { page: Page }) {
     for (const col of schema) {
       if (col.id === 'status' || col.name.toLowerCase() === 'status') {
         properties[col.id] = 'Backlog'
-      } else if (col.type === 'checkbox') {
-        properties[col.id] = false
-      } else if (col.type === 'number') {
-        properties[col.id] = null
       } else {
-        properties[col.id] = ''
+        properties[col.id] = emptyValueForType(col.type)
       }
     }
     void createPage({
@@ -114,12 +146,36 @@ export function DatabaseView({ page }: { page: Page }) {
         onIcon={(emoji) => void patchPage(page.id, { icon: emoji })}
       />
 
+      <div className="mb-3 flex flex-wrap gap-2 text-xs">
+        <input
+          value={filterText}
+          onChange={(e) => setFilterText(e.target.value)}
+          placeholder="Filtrar…"
+          className="rounded-md border border-notion-border bg-transparent px-2 py-1"
+        />
+        <select
+          value={sortProp}
+          onChange={(e) => setSortProp(e.target.value)}
+          className="rounded-md border border-notion-border bg-transparent px-2 py-1"
+          aria-label="Ordenar por"
+        >
+          <option value="">Orden</option>
+          {schema.map((c) => (
+            <option key={c.id} value={c.id}>
+              {c.name}
+            </option>
+          ))}
+        </select>
+      </div>
+
       {viewType === 'gallery' ? (
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
           {rows.map((row) => (
             <button
               key={row.id}
               type="button"
+              title={`Abrir «${row.title || 'Sin título'}»`}
+              aria-label={`Abrir «${row.title || 'Sin título'}»`}
               onClick={() => setActivePageId(row.id)}
               className="rounded-lg border border-notion-border bg-notion-sidebar p-4 text-left hover:bg-notion-hover"
             >
@@ -127,7 +183,7 @@ export function DatabaseView({ page }: { page: Page }) {
               {schema.slice(0, 2).map((col) => (
                 <div key={col.id} className="text-xs text-notion-text/60">
                   <span className="opacity-70">{col.name}: </span>
-                  {propValue(row, col.id) || '—'}
+                  {propValue(row, col.id, col.type) || '—'}
                 </div>
               ))}
             </button>
@@ -136,48 +192,92 @@ export function DatabaseView({ page }: { page: Page }) {
             <p className="text-sm text-notion-text/50">Sin filas. Añade una con “Nueva fila”.</p>
           )}
         </div>
-      ) : (
-        <div className="overflow-x-auto rounded-lg border border-notion-border">
-          <table className="w-full min-w-[640px] border-collapse text-sm">
-            <thead>
-              <tr className="bg-notion-sidebar text-left text-xs text-notion-text/60">
-                <th className="border-b border-notion-border px-3 py-2 font-medium">Título</th>
-                {schema.map((col) => (
-                  <th key={col.id} className="border-b border-notion-border px-3 py-2 font-medium">
-                    {col.name}
-                  </th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {rows.map((row) => (
-                <tr key={row.id} className="hover:bg-notion-hover/50">
-                  <td className="border-b border-notion-border px-3 py-1.5">
-                    <button
-                      type="button"
-                      className="text-left font-medium hover:underline"
-                      onClick={() => setActivePageId(row.id)}
-                    >
-                      {row.title || 'Sin título'}
-                    </button>
-                  </td>
-                  {schema.map((col) => (
-                    <td key={col.id} className="border-b border-notion-border px-2 py-1">
-                      <CellEditor
-                        col={col}
-                        value={row.properties[col.id] ?? null}
-                        onChange={(v) => updateCell(row, col.id, v)}
-                      />
-                    </td>
-                  ))}
-                </tr>
-              ))}
-            </tbody>
-          </table>
-          {rows.length === 0 && (
-            <p className="px-3 py-4 text-sm text-notion-text/50">Sin filas todavía.</p>
-          )}
+      ) : groups ? (
+        <div className="space-y-4">
+          {[...groups.entries()].map(([label, groupRows]) => (
+            <div key={label}>
+              <h3 className="mb-2 text-xs font-semibold uppercase text-notion-text/50">{label}</h3>
+              <TableRows
+                rows={groupRows}
+                schema={schema}
+                allPages={pages}
+                onOpen={setActivePageId}
+                onChange={updateCell}
+              />
+            </div>
+          ))}
         </div>
+      ) : (
+        <TableRows
+          rows={rows}
+          schema={schema}
+          allPages={pages}
+          onOpen={setActivePageId}
+          onChange={updateCell}
+        />
+      )}
+    </div>
+  )
+}
+
+function TableRows({
+  rows,
+  schema,
+  allPages,
+  onOpen,
+  onChange,
+}: {
+  rows: Page[]
+  schema: DbProperty[]
+  allPages: Page[]
+  onOpen: (id: string) => void
+  onChange: (row: Page, propId: string, value: PropertyValue) => void
+}) {
+  return (
+    <div className="overflow-x-auto rounded-lg border border-notion-border">
+      <table className="w-full min-w-[640px] border-collapse text-sm">
+        <thead>
+          <tr className="bg-notion-sidebar text-left text-xs text-notion-text/60">
+            <th className="border-b border-notion-border px-3 py-2 font-medium">Título</th>
+            {schema.map((col) => (
+              <th key={col.id} className="border-b border-notion-border px-3 py-2 font-medium">
+                {col.name}
+                <span className="ml-1 opacity-40">{col.type}</span>
+              </th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map((row) => (
+            <tr key={row.id} className="hover:bg-notion-hover/50">
+              <td className="border-b border-notion-border px-3 py-1.5">
+                <button
+                  type="button"
+                  title={`Abrir «${row.title || 'Sin título'}»`}
+                  className="text-left font-medium hover:underline"
+                  onClick={() => onOpen(row.id)}
+                >
+                  {row.title || 'Sin título'}
+                </button>
+              </td>
+              {schema.map((col) => (
+                <td key={col.id} className="border-b border-notion-border px-2 py-1">
+                  <CellEditor
+                    col={col}
+                    value={row.properties[col.id] ?? null}
+                    row={row}
+                    schema={schema}
+                    allPages={allPages}
+                    onChange={(v) => onChange(row, col.id, v)}
+                  />
+                </td>
+              ))}
+            </tr>
+          ))}
+        </tbody>
+      </table>
+      {rows.length === 0 && (
+        <p className="px-3 py-4 text-sm text-notion-text/50">Sin filas todavía.</p>
       )}
     </div>
   )
@@ -219,7 +319,13 @@ function DatabaseHeader({
           className="min-w-0 flex-1 bg-transparent text-3xl font-bold outline-none"
           onChange={(e) => onRename(e.target.value || 'Nueva base de datos')}
         />
-        <button type="button" className="rounded-md p-1.5 hover:bg-notion-hover" onClick={onFavorite}>
+        <button
+          type="button"
+          title={page.isFavorite ? 'Quitar de favoritos' : 'Añadir a favoritos'}
+          aria-label={page.isFavorite ? 'Quitar de favoritos' : 'Añadir a favoritos'}
+          className="rounded-md p-1.5 hover:bg-notion-hover"
+          onClick={onFavorite}
+        >
           <Star className={`size-5 ${page.isFavorite ? 'fill-amber-400 text-amber-400' : 'opacity-50'}`} />
         </button>
       </div>
@@ -227,10 +333,18 @@ function DatabaseHeader({
         {views.map((view) => {
           const Icon =
             view.type === 'gallery' ? LayoutGrid : view.type === 'board' ? Columns3 : Table2
+          const viewHint =
+            view.type === 'gallery'
+              ? 'Vista galería'
+              : view.type === 'board'
+                ? 'Vista tablero'
+                : 'Vista tabla'
           return (
             <button
               key={view.id}
               type="button"
+              title={`${viewHint}: ${view.name}`}
+              aria-label={`${viewHint}: ${view.name}`}
               onClick={() => onView(view.id)}
               className={`flex items-center gap-1.5 rounded-md px-2.5 py-1 text-sm ${
                 activeViewId === view.id ? 'bg-notion-active' : 'hover:bg-notion-hover'
@@ -244,6 +358,8 @@ function DatabaseHeader({
         <div className="ml-auto flex gap-2">
           <button
             type="button"
+            title="Añadir una columna / propiedad"
+            aria-label="Añadir una columna / propiedad"
             onClick={onAddProperty}
             className="rounded-md border border-notion-border px-2.5 py-1 text-sm hover:bg-notion-hover"
           >
@@ -251,6 +367,8 @@ function DatabaseHeader({
           </button>
           <button
             type="button"
+            title="Añadir una nueva fila"
+            aria-label="Añadir una nueva fila"
             onClick={onAddRow}
             className="flex items-center gap-1 rounded-md border border-notion-border px-2.5 py-1 text-sm hover:bg-notion-hover"
           >
@@ -267,10 +385,16 @@ function CellEditor({
   col,
   value,
   onChange,
+  row,
+  schema,
+  allPages,
 }: {
   col: DbProperty
   value: PropertyValue
   onChange: (v: PropertyValue) => void
+  row: Page
+  schema: DbProperty[]
+  allPages: Page[]
 }) {
   if (col.type === 'checkbox') {
     return (
@@ -304,11 +428,69 @@ function CellEditor({
         type="number"
         className="w-full bg-transparent px-1 py-1 outline-none"
         value={value == null || value === '' ? '' : Number(value)}
-        onChange={(e) =>
-          onChange(e.target.value === '' ? null : Number(e.target.value))
-        }
+        onChange={(e) => onChange(e.target.value === '' ? null : Number(e.target.value))}
       />
     )
+  }
+  if (col.type === 'date') {
+    return (
+      <input
+        type="date"
+        className="w-full bg-transparent px-1 py-1 outline-none"
+        value={typeof value === 'string' ? value.slice(0, 10) : ''}
+        onChange={(e) => onChange(coercePropertyValue('date', e.target.value))}
+      />
+    )
+  }
+  if (col.type === 'multi_select') {
+    const selected = Array.isArray(value) ? value : []
+    const options = col.options ?? []
+    return (
+      <select
+        multiple
+        className="max-h-16 w-full bg-transparent text-xs outline-none"
+        value={selected}
+        onChange={(e) => {
+          const vals = [...e.target.selectedOptions].map((o) => o.value)
+          onChange(vals)
+        }}
+      >
+        {options.map((opt) => (
+          <option key={opt} value={opt}>
+            {opt}
+          </option>
+        ))}
+      </select>
+    )
+  }
+  if (col.type === 'relation') {
+    const selected = Array.isArray(value) ? value : []
+    return (
+      <select
+        className="w-full bg-transparent text-xs outline-none"
+        value={selected[0] ?? ''}
+        onChange={(e) => onChange(e.target.value ? [e.target.value] : [])}
+      >
+        <option value="">—</option>
+        {allPages
+          .filter((p) => p.id !== row.id)
+          .slice(0, 80)
+          .map((p) => (
+            <option key={p.id} value={p.id}>
+              {p.title || 'Sin título'}
+            </option>
+          ))}
+      </select>
+    )
+  }
+  if (col.type === 'formula') {
+    const byName: Record<string, string | number | boolean | null> = {}
+    for (const c of schema) {
+      const v = row.properties[c.id]
+      byName[c.name] = Array.isArray(v) ? v.join(',') : (v as string | number | boolean | null)
+    }
+    const result = col.formula ? evaluateFormula(col.formula, byName) : null
+    return <span className="px-1 text-notion-text/70">{displayPropertyValue(result)}</span>
   }
   return (
     <input
