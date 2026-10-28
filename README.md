@@ -28,8 +28,13 @@ Espacio local tipo Notion para notas, tableros Kanban y bases de datos. Todo cor
 - **Nota del día** (una página por fecha)
 - Pantalla de bienvenida en el primer uso
 - Autosave IndexedDB + tema claro/oscuro
+- Atajos de teclado
 
 ### Tableros y bases de datos
+
+<p align="center">
+<img width="1919" height="932" alt="atajos-teclado" src="https://github.com/user-attachments/assets/7dd8b4ff-25c9-4478-840c-109084aa598d" />
+</p>
 
 - Tablero Kanban (Backlog / Doing / Done) con drag-and-drop
 - Base de datos con vistas Tabla, Galería y Tablero
