@@ -1,8 +1,47 @@
+import { Columns3, Database, FileText } from 'lucide-react'
 import { usePagesContext } from '../../context/PagesContext'
+import type { Page } from '../../db/types'
 import { PageItem } from './PageItem'
 
-export function PageTree() {
-  const { tree, favorites, recents, setActivePageId, activePageId } = usePagesContext()
+function PageGlyph({ page }: { page: Page }) {
+  if (page.icon) return <span className="text-base leading-none">{page.icon}</span>
+  if (page.kind === 'board') return <Columns3 className="size-4 opacity-60" />
+  if (page.kind === 'database') return <Database className="size-4 opacity-60" />
+  return <FileText className="size-4 opacity-60" />
+}
+
+export function PageTree({ collapsed = false }: { collapsed?: boolean }) {
+  const { tree, favorites, recents, pages, setActivePageId, activePageId } = usePagesContext()
+
+  if (collapsed) {
+    const rail = [
+      ...favorites,
+      ...pages.filter((p) => !favorites.some((f) => f.id === p.id)),
+    ]
+    // Prefer roots first for a cleaner rail, then the rest
+    const roots = rail.filter((p) => p.parentId === null)
+    const rest = rail.filter((p) => p.parentId !== null)
+    const ordered = [...roots, ...rest]
+
+    return (
+      <nav className="flex flex-col items-center gap-0.5 px-1" aria-label="Páginas">
+        {ordered.map((page) => (
+          <button
+            key={page.id}
+            type="button"
+            title={page.title || 'Sin título'}
+            aria-label={page.title || 'Sin título'}
+            onClick={() => setActivePageId(page.id)}
+            className={`flex size-9 items-center justify-center rounded-md ${
+              activePageId === page.id ? 'bg-notion-active' : 'hover:bg-notion-hover'
+            }`}
+          >
+            <PageGlyph page={page} />
+          </button>
+        ))}
+      </nav>
+    )
+  }
 
   return (
     <div className="flex flex-col gap-3">

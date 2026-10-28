@@ -8,7 +8,7 @@ import Underline from '@tiptap/extension-underline'
 import { EditorContent, useEditor, type Editor } from '@tiptap/react'
 import StarterKit from '@tiptap/starter-kit'
 import { FileText, Star } from 'lucide-react'
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { usePagesContext } from '../../context/PagesContext'
 import { DEFAULT_TITLE } from '../../lib/constants'
 import type { Page } from '../../db/types'
@@ -16,6 +16,7 @@ import { useAutosave } from '../../hooks/useAutosave'
 import { Breadcrumbs } from '../layout/Breadcrumbs'
 import { PageIconButton } from '../ui/EmojiPicker'
 import { EditorBubbleMenu } from './EditorBubbleMenu'
+import { ImageLightbox } from './ImageLightbox'
 import { Callout } from './extensions/Callout'
 import { PageLink } from './extensions/PageLink'
 import { SlashCommand } from './slash/SlashCommand'
@@ -35,6 +36,7 @@ export function BlockEditor({ page }: { page: Page }) {
   const titleRef = useRef(page.title)
   const pagesRef = useRef(pages)
   const editorRef = useRef<Editor | null>(null)
+  const [lightboxSrc, setLightboxSrc] = useState<string | null>(null)
   pagesRef.current = pages
 
   useEffect(() => {
@@ -155,7 +157,18 @@ export function BlockEditor({ page }: { page: Page }) {
         </button>
       </div>
       {editor && <EditorBubbleMenu editor={editor} />}
-      <EditorContent editor={editor} />
+      <div
+        onDoubleClick={(e) => {
+          const target = e.target
+          if (!(target instanceof HTMLImageElement)) return
+          if (!target.closest('.ProseMirror')) return
+          e.preventDefault()
+          setLightboxSrc(target.currentSrc || target.src)
+        }}
+      >
+        <EditorContent editor={editor} />
+      </div>
+      <ImageLightbox src={lightboxSrc} onClose={() => setLightboxSrc(null)} />
     </div>
   )
 }

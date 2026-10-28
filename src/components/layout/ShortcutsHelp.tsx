@@ -43,6 +43,7 @@ const SECTIONS: { title: string; shortcuts: { keys: string; desc: string }[] }[]
       { keys: '--- / Separador', desc: 'Línea divisoria (menú /)' },
       { keys: '/ Imagen', desc: 'Insertar imagen por URL' },
       { keys: 'Pegar / soltar', desc: 'Insertar imagen desde el portapapeles' },
+      { keys: 'Doble clic', desc: 'Imagen a pantalla completa' },
       { keys: '[[Título]]', desc: 'Enlace a otra página (título exacto)' },
     ],
   },
@@ -86,7 +87,7 @@ export function ShortcutsHelp() {
         type="button"
         aria-label="Atajos de teclado (?)"
         title="Atajos de teclado (?)"
-        className="rounded-md p-1.5 text-notion-text/70 hover:bg-notion-hover"
+        className="flex size-9 items-center justify-center rounded-md p-1.5 text-notion-text/70 hover:bg-notion-hover"
         onClick={() => setOpen(true)}
       >
         <Keyboard className="size-4" />

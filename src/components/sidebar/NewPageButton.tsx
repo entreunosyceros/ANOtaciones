@@ -9,7 +9,7 @@ const OPTIONS: { kind: PageKind; label: string; icon: typeof FileText }[] = [
   { kind: 'database', label: 'Base de datos', icon: Database },
 ]
 
-export function NewPageButton() {
+export function NewPageButton({ collapsed = false }: { collapsed?: boolean }) {
   const { createPage } = usePagesContext()
   const [open, setOpen] = useState(false)
 
@@ -18,13 +18,21 @@ export function NewPageButton() {
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
-        className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-sm text-notion-text hover:bg-notion-hover"
+        title="Nueva página"
+        aria-label="Nueva página"
+        className={`flex items-center gap-2 rounded-md text-sm text-notion-text hover:bg-notion-hover ${
+          collapsed ? 'mx-auto size-9 justify-center' : 'w-full px-2 py-1.5'
+        }`}
       >
         <Plus className="size-4 shrink-0 opacity-60" />
-        Nueva página
+        {!collapsed && 'Nueva página'}
       </button>
       {open && (
-        <div className="absolute left-0 right-0 z-20 mt-1 rounded-md border border-notion-border bg-notion-bg p-1 shadow-lg">
+        <div
+          className={`absolute z-20 mt-1 rounded-md border border-notion-border bg-notion-bg p-1 shadow-lg ${
+            collapsed ? 'left-full top-0 ml-1 w-48' : 'left-0 right-0'
+          }`}
+        >
           {OPTIONS.map(({ kind, label, icon: Icon }) => (
             <button
               key={kind}
