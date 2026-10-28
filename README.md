@@ -13,6 +13,12 @@ Espacio local tipo Notion para notas, tableros Kanban y bases de datos. Todo cor
 
 ### Notas y wiki
 
+<p align="center">
+
+<img width="1919" height="934" alt="anotaciones" src="https://github.com/user-attachments/assets/199bc48f-4874-48d1-90ed-66767361696b" />
+
+</p>
+
 - Árbol de páginas anidadas, favoritos y **recientes**
 - Icono emoji por página
 - Búsqueda `Ctrl/Cmd+K`
