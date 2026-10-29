@@ -150,6 +150,13 @@ sudo ./packaging/uninstall.sh
 
 Tras instalar, busca **ANOtaciones** en el menú de aplicaciones o ejecuta `anotaciones`.
 
+
+<p align="center">
+  
+<img width="648" height="250" alt="lanzador" src="https://github.com/user-attachments/assets/019c6544-f147-4d8f-9a86-6c6e07bb8133" />
+
+</p>
+
 **Bandeja del sistema**
 
 | Acción | Comportamiento |
