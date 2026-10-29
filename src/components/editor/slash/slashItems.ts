@@ -53,8 +53,8 @@ export const slashItems: SlashItem[] = [
     command: (editor) => editor.chain().focus().toggleBlockquote().run(),
   },
   {
-    title: 'Callout',
-    description: 'Nota destacada',
+    title: 'Nota destacada',
+    description: 'Bloque de aviso resaltado',
     command: (editor) =>
       editor
         .chain()

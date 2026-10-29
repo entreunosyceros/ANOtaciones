@@ -1,4 +1,28 @@
-import type { DbProperty, DbPropertyType, PropertyValue } from '../db/types'
+import type { DbProperty, DbPropertyType, PropertyValue, TaskPriority } from '../db/types'
+import { normalizeBoardStatus } from '../db/types'
+import { TASK_PRIORITY_LABELS } from './taskProps'
+
+export const DB_PROPERTY_TYPE_LABELS: Record<DbPropertyType, string> = {
+  text: 'texto',
+  select: 'lista',
+  number: 'número',
+  checkbox: 'casilla',
+  date: 'fecha',
+  multi_select: 'varias opciones',
+  relation: 'relación',
+  formula: 'fórmula',
+}
+
+/** Etiqueta visible para valores de select (prioridad / estado). */
+export function formatSelectOptionLabel(opt: string): string {
+  if (opt === 'low' || opt === 'medium' || opt === 'high') {
+    return TASK_PRIORITY_LABELS[opt as TaskPriority]
+  }
+  if (opt === 'Backlog' || opt === 'Doing' || opt === 'Done') {
+    return normalizeBoardStatus(opt)
+  }
+  return opt
+}
 
 export function coercePropertyValue(type: DbPropertyType, raw: unknown): PropertyValue {
   switch (type) {
@@ -49,7 +73,8 @@ export function emptyValueForType(type: DbPropertyType): PropertyValue {
 
 export function displayPropertyValue(value: PropertyValue): string {
   if (value == null) return ''
-  if (Array.isArray(value)) return value.join(', ')
+  if (Array.isArray(value)) return value.map((v) => formatSelectOptionLabel(v)).join(', ')
+  if (typeof value === 'string') return formatSelectOptionLabel(value)
   return String(value)
 }
 

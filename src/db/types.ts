@@ -163,15 +163,26 @@ export interface Page {
 
 export type PageNode = Page & { children: PageNode[] }
 
-export const BOARD_STATUSES = ['Backlog', 'Doing', 'Done'] as const
+export const BOARD_STATUSES = ['Pendiente', 'En curso', 'Hecho'] as const
 export type BoardStatus = (typeof BOARD_STATUSES)[number]
+
+/** Normaliza estados legacy en inglés y valores actuales en español. */
+export function normalizeBoardStatus(raw: unknown): BoardStatus {
+  if (raw === 'Doing' || raw === 'En curso') return 'En curso'
+  if (raw === 'Done' || raw === 'Hecho') return 'Hecho'
+  if (raw === 'Backlog' || raw === 'Pendiente') return 'Pendiente'
+  if (typeof raw === 'string' && (BOARD_STATUSES as readonly string[]).includes(raw)) {
+    return raw as BoardStatus
+  }
+  return 'Pendiente'
+}
 
 export function defaultDatabaseSchema(): DbProperty[] {
   return [
-    { id: 'name', name: 'Name', type: 'text' },
+    { id: 'name', name: 'Nombre', type: 'text' },
     {
       id: 'status',
-      name: 'Status',
+      name: 'Estado',
       type: 'select',
       options: [...BOARD_STATUSES],
     },

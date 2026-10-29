@@ -1,6 +1,16 @@
 import { usePagesContext } from '../../context/PagesContext'
 import type { Page, TaskPriority } from '../../db/types'
-import { TASK_PRIORITIES, getDue, getPriority, getStatus, isInbox } from '../../lib/taskProps'
+import {
+  BOARD_STATUSES,
+} from '../../db/types'
+import {
+  TASK_PRIORITIES,
+  TASK_PRIORITY_LABELS,
+  getDue,
+  getPriority,
+  getStatus,
+  isInbox,
+} from '../../lib/taskProps'
 
 export function TaskMetaBar({ page }: { page: Page }) {
   const { patchPage } = usePagesContext()
@@ -36,7 +46,7 @@ export function TaskMetaBar({ page }: { page: Page }) {
           <option value="">—</option>
           {TASK_PRIORITIES.map((p) => (
             <option key={p} value={p}>
-              {p}
+              {TASK_PRIORITY_LABELS[p]}
             </option>
           ))}
         </select>
@@ -49,9 +59,11 @@ export function TaskMetaBar({ page }: { page: Page }) {
           className="rounded border border-notion-border bg-transparent px-1 py-0.5"
         >
           <option value="">—</option>
-          <option value="Backlog">Backlog</option>
-          <option value="Doing">Doing</option>
-          <option value="Done">Done</option>
+          {BOARD_STATUSES.map((s) => (
+            <option key={s} value={s}>
+              {s}
+            </option>
+          ))}
         </select>
       </label>
       <label className="flex items-center gap-1">

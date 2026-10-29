@@ -4,7 +4,8 @@
 set -euo pipefail
 
 PORT="${ANOTACIONES_PORT:-8765}"
-URL="http://127.0.0.1:${PORT}"
+# ?app=1: modo escritorio (sin SW / bypass caché HTML obsoleta)
+URL="http://127.0.0.1:${PORT}/?app=1"
 WM_CLASS="anotaciones"
 USER_DATA_DIR="${XDG_CONFIG_HOME:-$HOME/.config}/anotaciones-browser"
 # Si el navegador elegido es snap, el perfil debe vivir bajo ~/snap/<app>/common/

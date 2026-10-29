@@ -1,5 +1,5 @@
 import type { Page, TaskFilter, TaskPriority, TaskSort } from '../db/types'
-import { BOARD_STATUSES, isLivePage } from '../db/types'
+import { BOARD_STATUSES, isLivePage, normalizeBoardStatus } from '../db/types'
 
 /** Canonical productivity property keys on Page.properties */
 export const TASK_PROP = {
@@ -10,6 +10,12 @@ export const TASK_PROP = {
 } as const
 
 export const TASK_PRIORITIES: TaskPriority[] = ['low', 'medium', 'high']
+
+export const TASK_PRIORITY_LABELS: Record<TaskPriority, string> = {
+  low: 'Baja',
+  medium: 'Media',
+  high: 'Alta',
+}
 
 const PRIORITY_RANK: Record<TaskPriority, number> = { high: 0, medium: 1, low: 2 }
 
@@ -26,7 +32,8 @@ export function getPriority(page: Page): TaskPriority | null {
 
 export function getStatus(page: Page): string | null {
   const v = page.properties[TASK_PROP.status]
-  return typeof v === 'string' && v ? v : null
+  if (typeof v !== 'string' || !v) return null
+  return normalizeBoardStatus(v)
 }
 
 export function isInbox(page: Page): boolean {
@@ -42,6 +49,9 @@ export function isTaskPage(page: Page): boolean {
   if (getPriority(page)) return true
   const status = getStatus(page)
   if (status && (BOARD_STATUSES as readonly string[]).includes(status)) return true
+  // Datos legacy en inglés
+  const raw = page.properties[TASK_PROP.status]
+  if (raw === 'Backlog' || raw === 'Doing' || raw === 'Done') return true
   return false
 }
 

@@ -552,7 +552,7 @@ export async function createInboxTask(input: {
     icon: '📥',
     properties: {
       inbox: true,
-      status: 'Backlog',
+      status: 'Pendiente',
       ...(input.due ? { due: input.due } : {}),
       ...(input.priority ? { priority: input.priority } : {}),
     },

@@ -4,7 +4,14 @@ import { createId } from '../../lib/id'
 import { applyDbView } from '../../lib/dbFilters'
 import { evaluateFormula } from '../../lib/formulaGraph'
 import { formatDateEs } from '../../lib/dates'
-import { coercePropertyValue, displayPropertyValue, emptyValueForType } from '../../lib/propertyTypes'
+import {
+  coercePropertyValue,
+  DB_PROPERTY_TYPE_LABELS,
+  displayPropertyValue,
+  emptyValueForType,
+  formatSelectOptionLabel,
+  isValidPropertyType,
+} from '../../lib/propertyTypes'
 import { usePagesContext } from '../../context/PagesContext'
 import {
   BOARD_STATUSES,
@@ -22,6 +29,26 @@ function propValue(page: Page, key: string, type?: string): string {
   const v = page.properties[key] ?? null
   if (type === 'date' && typeof v === 'string') return formatDateEs(v) || '—'
   return displayPropertyValue(v)
+}
+
+const TYPE_ALIASES: Record<string, DbPropertyType> = {
+  texto: 'text',
+  lista: 'select',
+  número: 'number',
+  numero: 'number',
+  casilla: 'checkbox',
+  fecha: 'date',
+  'varias opciones': 'multi_select',
+  relación: 'relation',
+  relacion: 'relation',
+  fórmula: 'formula',
+  formula: 'formula',
+}
+
+function resolvePropertyType(raw: string): DbPropertyType | null {
+  const key = raw.toLowerCase()
+  if (isValidPropertyType(key)) return key
+  return TYPE_ALIASES[key] ?? null
 }
 
 export function DatabaseView({ page }: { page: Page }) {
@@ -70,17 +97,22 @@ export function DatabaseView({ page }: { page: Page }) {
   }
 
   const addProperty = () => {
-    const type = window.prompt(
-      'Tipo: text | select | number | checkbox | date | multi_select | relation | formula',
-      'text',
-    ) as DbPropertyType | null
-    if (!type) return
+    const raw = window.prompt(
+      'Tipo de propiedad:\ntexto | lista | número | casilla | fecha | varias opciones | relación | fórmula\n(también acepta: text, select, number, checkbox, date, multi_select, relation, formula)',
+      'texto',
+    )
+    if (!raw) return
+    const type = resolvePropertyType(raw.trim())
+    if (!type) {
+      window.alert('Tipo no reconocido.')
+      return
+    }
     const next: DbProperty = {
       id: createId(),
       name: 'Nueva propiedad',
       type,
-      options: type === 'select' || type === 'multi_select' ? ['A', 'B'] : [],
-      formula: type === 'formula' ? 'prop("Name")' : undefined,
+      options: type === 'select' || type === 'multi_select' ? ['Opción A', 'Opción B'] : [],
+      formula: type === 'formula' ? 'prop("Nombre")' : undefined,
     }
     void patchPage(page.id, { dbSchema: [...schema, next] })
   }
@@ -88,8 +120,9 @@ export function DatabaseView({ page }: { page: Page }) {
   const addRow = () => {
     const properties: Record<string, PropertyValue> = {}
     for (const col of schema) {
-      if (col.id === 'status' || col.name.toLowerCase() === 'status') {
-        properties[col.id] = 'Backlog'
+      const n = col.name.toLowerCase()
+      if (col.id === 'status' || n === 'status' || n === 'estado') {
+        properties[col.id] = 'Pendiente'
       } else {
         properties[col.id] = emptyValueForType(col.type)
       }
@@ -106,7 +139,12 @@ export function DatabaseView({ page }: { page: Page }) {
   const updateCell = (row: Page, propId: string, value: PropertyValue) => {
     const nextProps = { ...row.properties, [propId]: value }
     const patch: Parameters<typeof patchPage>[1] = { properties: nextProps }
-    if (propId === 'name' || schema.find((c) => c.id === propId)?.name === 'Name') {
+    const colName = schema.find((c) => c.id === propId)?.name
+    if (
+      propId === 'name' ||
+      colName === 'Name' ||
+      colName === 'Nombre'
+    ) {
       patch.title = String(value || 'Sin título')
     }
     void patchPage(row.id, patch)
@@ -242,7 +280,9 @@ function TableRows({
             {schema.map((col) => (
               <th key={col.id} className="border-b border-notion-border px-3 py-2 font-medium">
                 {col.name}
-                <span className="ml-1 opacity-40">{col.type}</span>
+                <span className="ml-1 opacity-40">
+                  {DB_PROPERTY_TYPE_LABELS[col.type] ?? col.type}
+                </span>
               </th>
             ))}
           </tr>
@@ -416,7 +456,7 @@ function CellEditor({
         <option value="">—</option>
         {options.map((opt) => (
           <option key={opt} value={opt}>
-            {opt}
+            {formatSelectOptionLabel(opt)}
           </option>
         ))}
       </select>
@@ -457,7 +497,7 @@ function CellEditor({
       >
         {options.map((opt) => (
           <option key={opt} value={opt}>
-            {opt}
+            {formatSelectOptionLabel(opt)}
           </option>
         ))}
       </select>

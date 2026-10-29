@@ -2,11 +2,17 @@ import { Plus } from 'lucide-react'
 import { useMemo, useState } from 'react'
 import { usePagesContext } from '../../context/PagesContext'
 import type { DashboardWidgetId, TaskFilter, TaskPriority } from '../../db/types'
-import { defaultDashboardWidgets } from '../../db/types'
+import { BOARD_STATUSES, defaultDashboardWidgets } from '../../db/types'
 import { getDayItems } from '../../lib/calendarDay'
 import { createId } from '../../lib/id'
 import { formatDateEs, formatMonthYearEs } from '../../lib/dates'
-import { getDue, getPriority, getStatus, listTasks, todayIso } from '../../lib/taskProps'
+import {
+  getDue,
+  getPriority,
+  getStatus,
+  listTasks,
+  todayIso,
+} from '../../lib/taskProps'
 import { CalendarDayPanel } from './CalendarDayPanel'
 
 export type ProductivityMode = 'inbox' | 'tasks' | 'calendar' | 'dashboard'
@@ -61,7 +67,7 @@ function InboxPanel({ onOpenPage }: { onOpenPage: (id: string) => void }) {
           void patchPage(id, {
             properties: {
               ...(pages.find((p) => p.id === id)?.properties ?? {}),
-              status: 'Done',
+              status: 'Hecho',
               inbox: false,
             },
           })
@@ -89,9 +95,11 @@ function TaskCenter({ onOpenPage }: { onOpenPage: (id: string) => void }) {
           aria-label="Filtrar por estado"
         >
           <option value="">Estado</option>
-          <option value="Backlog">Backlog</option>
-          <option value="Doing">Doing</option>
-          <option value="Done">Done</option>
+          {BOARD_STATUSES.map((s) => (
+            <option key={s} value={s}>
+              {s}
+            </option>
+          ))}
         </select>
         <select
           className="rounded-md border border-notion-border bg-transparent px-2 py-1"
@@ -171,7 +179,7 @@ function TaskCenter({ onOpenPage }: { onOpenPage: (id: string) => void }) {
         onDone={(id) => {
           const p = pages.find((x) => x.id === id)
           if (!p) return
-          void patchPage(id, { properties: { ...p.properties, status: 'Done' } })
+          void patchPage(id, { properties: { ...p.properties, status: 'Hecho' } })
         }}
       />
     </div>
@@ -328,6 +336,13 @@ function CalendarPanel({ onOpenPage }: { onOpenPage: (id: string) => void }) {
   )
 }
 
+const WIDGET_LABELS: Record<DashboardWidgetId, string> = {
+  dueToday: 'Vencen hoy',
+  highPriority: 'Alta prioridad',
+  inbox: 'Bandeja',
+  favorites: 'Favoritos',
+}
+
 function DashboardPanel({ onOpenPage }: { onOpenPage: (id: string) => void }) {
   const { pages, favorites, savedViews, saveView } = usePagesContext()
   const dash = savedViews.find((v) => v.scope === 'dashboard')
@@ -360,7 +375,7 @@ function DashboardPanel({ onOpenPage }: { onOpenPage: (id: string) => void }) {
             }`}
             onClick={() => toggleWidget(id)}
           >
-            {id}
+            {WIDGET_LABELS[id]}
           </button>
         ))}
       </div>

@@ -32,7 +32,7 @@ const SECTIONS: { title: string; shortcuts: { keys: string; desc: string }[] }[]
   {
     title: 'Editor — bloques',
     shortcuts: [
-      { keys: '/', desc: 'Menú de bloques (títulos, listas, callout…)' },
+      { keys: '/', desc: 'Menú de bloques (títulos, listas, nota destacada…)' },
       { keys: '# + espacio', desc: 'Título 1' },
       { keys: '## + espacio', desc: 'Título 2' },
       { keys: '### + espacio', desc: 'Título 3' },

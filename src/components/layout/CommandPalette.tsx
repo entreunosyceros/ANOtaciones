@@ -6,9 +6,9 @@ import { searchPages } from '../../lib/search'
 
 const KINDS: { value: PageKind | 'all'; label: string }[] = [
   { value: 'all', label: 'Todos' },
-  { value: 'doc', label: 'Docs' },
+  { value: 'doc', label: 'Documentos' },
   { value: 'board', label: 'Tableros' },
-  { value: 'database', label: 'BBDD' },
+  { value: 'database', label: 'Bases de datos' },
 ]
 
 export function CommandPalette() {

@@ -14,16 +14,12 @@ import { CSS } from '@dnd-kit/utilities'
 import { Columns3, Plus, Star } from 'lucide-react'
 import { useMemo, useState } from 'react'
 import { usePagesContext } from '../../context/PagesContext'
-import { BOARD_STATUSES, type BoardStatus, type Page } from '../../db/types'
+import { BOARD_STATUSES, normalizeBoardStatus, type BoardStatus, type Page } from '../../db/types'
 import { Breadcrumbs } from '../layout/Breadcrumbs'
 import { PageIconButton } from '../ui/EmojiPicker'
 
 function cardStatus(page: Page): BoardStatus {
-  const s = page.properties.status
-  if (typeof s === 'string' && (BOARD_STATUSES as readonly string[]).includes(s)) {
-    return s as BoardStatus
-  }
-  return 'Backlog'
+  return normalizeBoardStatus(page.properties.status)
 }
 
 function SortableCard({
@@ -106,11 +102,10 @@ export function KanbanBoard({ page, embedded = false }: { page: Page; embedded?:
   )
 
   const byStatus = useMemo(() => {
-    const map: Record<BoardStatus, Page[]> = {
-      Backlog: [],
-      Doing: [],
-      Done: [],
-    }
+    const map = Object.fromEntries(BOARD_STATUSES.map((s) => [s, [] as Page[]])) as Record<
+      BoardStatus,
+      Page[]
+    >
     for (const card of cards) {
       map[cardStatus(card)].push(card)
     }
@@ -155,7 +150,7 @@ export function KanbanBoard({ page, embedded = false }: { page: Page; embedded?:
       parentId: page.id,
       title: 'Nueva tarjeta',
       kind: 'doc',
-      properties: { status: 'Backlog' },
+      properties: { status: 'Pendiente' },
       open: false,
     })
 
@@ -189,8 +184,8 @@ export function KanbanBoard({ page, embedded = false }: { page: Page; embedded?:
             </button>
             <button
               type="button"
-              title="Añadir una tarjeta al Backlog"
-              aria-label="Añadir una tarjeta al Backlog"
+              title="Añadir una tarjeta a Pendiente"
+              aria-label="Añadir una tarjeta a Pendiente"
               className="flex items-center gap-1 rounded-md border border-notion-border px-3 py-1.5 text-sm hover:bg-notion-hover"
               onClick={addCard}
             >
@@ -205,8 +200,8 @@ export function KanbanBoard({ page, embedded = false }: { page: Page; embedded?:
         <div className="mb-3">
           <button
             type="button"
-            title="Añadir una tarjeta al Backlog"
-            aria-label="Añadir una tarjeta al Backlog"
+            title="Añadir una tarjeta a Pendiente"
+            aria-label="Añadir una tarjeta a Pendiente"
             className="flex items-center gap-1 rounded-md border border-notion-border px-3 py-1.5 text-sm hover:bg-notion-hover"
             onClick={addCard}
           >

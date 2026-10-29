@@ -396,7 +396,7 @@ export function PagesProvider({ children }: { children: ReactNode }) {
         icon: '✅',
         properties: {
           due: input.due.slice(0, 10),
-          status: 'Backlog',
+          status: 'Pendiente',
           inbox: false,
         },
         open: false,

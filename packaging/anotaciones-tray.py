@@ -10,7 +10,8 @@ import time
 from pathlib import Path
 
 PORT = int(os.environ.get("ANOTACIONES_PORT", "8765"))
-URL = f"http://127.0.0.1:{PORT}"
+# ?app=1 evita el match del service worker con "/" cacheado (index.html obsoleto → pantalla blanca).
+URL = f"http://127.0.0.1:{PORT}/?app=1"
 APP_DIR = Path(os.environ.get("ANOTACIONES_APP_DIR", Path(__file__).resolve().parent))
 ICON_PATH = APP_DIR / "logo.png"
 SERVER_PID = os.environ.get("ANOTACIONES_SERVER_PID", "").strip()
@@ -174,16 +175,18 @@ def launch_browser() -> bool:
 
 
 def open_app(_widget=None) -> None:
+    # Ventana visible → solo enfocar
     if focus_window():
         return
+
+    # Proceso vivo pero sin ventana enfocable: matar perfil y relanzar
+    # (relanzar encima del SingletonLock suele abrir una segunda ventana en blanco).
     if app_running():
-        if not focus_window():
-            print(
-                "ANOtaciones: la app ya está en ejecución "
-                "(instala wmctrl o xdotool para enfocar la ventana).",
-                file=sys.stderr,
-            )
+        kill_browser()
+        time.sleep(0.25)
+        launch_browser()
         return
+
     launch_browser()
 
 

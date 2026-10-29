@@ -58,3 +58,4 @@ test-results/
 .cursor/
 .superpowers/
 docs/superpowers/
+packaging/__pycache__/

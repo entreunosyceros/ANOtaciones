@@ -6,7 +6,7 @@ import { Tooltip } from '../ui/Tooltip'
 
 const OPTIONS: { kind: PageKind; label: string; hint: string; icon: typeof FileText }[] = [
   { kind: 'doc', label: 'Documento', hint: 'Página de texto con editor', icon: FileText },
-  { kind: 'board', label: 'Tablero Kanban', hint: 'Columnas Backlog / Doing / Done', icon: Columns3 },
+  { kind: 'board', label: 'Tablero Kanban', hint: 'Columnas Pendiente / En curso / Hecho', icon: Columns3 },
   { kind: 'database', label: 'Base de datos', hint: 'Tabla, galería o tablero', icon: Database },
 ]
 

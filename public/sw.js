@@ -1,6 +1,9 @@
-/* Minimal offline shell cache for ANOtaciones PWA */
-const CACHE = 'anotaciones-shell-v1'
-const ASSETS = ['/', '/index.html', '/manifest.webmanifest', '/logo.png']
+/* Minimal offline shell cache for ANOtaciones PWA.
+ * HTML/navegación: network-first (evita index.html viejo con hashes de assets obsoletos → pantalla blanca).
+ * Resto: network-first con fallback a caché.
+ */
+const CACHE = 'anotaciones-shell-v2'
+const ASSETS = ['/manifest.webmanifest', '/logo.png']
 
 self.addEventListener('install', (event) => {
   event.waitUntil(caches.open(CACHE).then((cache) => cache.addAll(ASSETS)).then(() => self.skipWaiting()))
@@ -17,16 +20,40 @@ self.addEventListener('activate', (event) => {
 self.addEventListener('fetch', (event) => {
   const { request } = event
   if (request.method !== 'GET') return
-  event.respondWith(
-    caches.match(request).then((cached) => {
-      const fetched = fetch(request)
+
+  const accept = request.headers.get('accept') || ''
+  const isHtml =
+    request.mode === 'navigate' ||
+    accept.includes('text/html') ||
+    new URL(request.url).pathname === '/' ||
+    new URL(request.url).pathname.endsWith('.html')
+
+  if (isHtml) {
+    event.respondWith(
+      fetch(request)
         .then((response) => {
-          const copy = response.clone()
-          void caches.open(CACHE).then((cache) => cache.put(request, copy))
+          if (response.ok) {
+            const copy = response.clone()
+            void caches.open(CACHE).then((cache) => cache.put(request, copy))
+          }
           return response
         })
-        .catch(() => cached)
-      return cached || fetched
-    }),
+        .catch(() =>
+          caches.match(request).then((cached) => cached || caches.match('/index.html')),
+        ),
+    )
+    return
+  }
+
+  event.respondWith(
+    fetch(request)
+      .then((response) => {
+        if (response.ok) {
+          const copy = response.clone()
+          void caches.open(CACHE).then((cache) => cache.put(request, copy))
+        }
+        return response
+      })
+      .catch(() => caches.match(request)),
   )
 })
