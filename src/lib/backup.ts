@@ -1,9 +1,19 @@
-import type { AttachmentMeta, Page, PageKind, SavedView, Tag, TipTapDoc } from '../db/types'
+import type {
+  AttachmentMeta,
+  Bookmark,
+  BookmarkFolder,
+  BookmarkTag,
+  Page,
+  PageKind,
+  SavedView,
+  Tag,
+  TipTapDoc,
+} from '../db/types'
 import { findBrokenPageLinks } from './pageLinks'
 
-export const BACKUP_VERSION = 5 as const
+export const BACKUP_VERSION = 6 as const
 
-export type BackupVersion = 1 | 2 | 3 | 4 | 5
+export type BackupVersion = 1 | 2 | 3 | 4 | 5 | 6
 
 export interface BackupPayload {
   version: BackupVersion
@@ -12,6 +22,9 @@ export interface BackupPayload {
   tags?: Tag[]
   savedViews?: SavedView[]
   attachments?: AttachmentMeta[]
+  bookmarkFolders?: BookmarkFolder[]
+  bookmarkTags?: BookmarkTag[]
+  bookmarks?: Bookmark[]
 }
 
 export type ImportMode = 'merge' | 'replace'
@@ -29,17 +42,23 @@ export interface ImportReport {
   tags: Tag[]
   savedViews: SavedView[]
   attachments: AttachmentMeta[]
+  bookmarkFolders: BookmarkFolder[]
+  bookmarkTags: BookmarkTag[]
+  bookmarks: Bookmark[]
   version: BackupVersion | null
 }
 
 const PAGE_KINDS: PageKind[] = ['doc', 'board', 'database']
-const SUPPORTED = new Set([1, 2, 3, 4, 5])
+const SUPPORTED = new Set([1, 2, 3, 4, 5, 6])
 
 export function buildBackup(
   pages: Page[],
   tags: Tag[] = [],
   savedViews: SavedView[] = [],
   attachments: AttachmentMeta[] = [],
+  bookmarkFolders: BookmarkFolder[] = [],
+  bookmarkTags: BookmarkTag[] = [],
+  bookmarks: Bookmark[] = [],
 ): BackupPayload {
   return {
     version: BACKUP_VERSION,
@@ -48,6 +67,9 @@ export function buildBackup(
     tags,
     savedViews,
     attachments,
+    bookmarkFolders,
+    bookmarkTags,
+    bookmarks,
   }
 }
 
@@ -120,6 +142,40 @@ export function analyzeBackup(raw: unknown): ImportReport {
       )
     : []
 
+  const bookmarkFolders = Array.isArray(data.bookmarkFolders)
+    ? data.bookmarkFolders.filter(isBookmarkFolder).map((f) => ({
+        id: f.id,
+        name: String(f.name).trim() || 'Carpeta',
+        parentId: f.parentId == null ? null : String(f.parentId),
+        order: typeof f.order === 'number' ? f.order : 0,
+        createdAt: typeof f.createdAt === 'number' ? f.createdAt : Date.now(),
+      }))
+    : []
+
+  const bookmarkTags = Array.isArray(data.bookmarkTags)
+    ? data.bookmarkTags.filter(isBookmarkTag).map((t) => ({
+        id: t.id,
+        name: String(t.name).trim() || 'etiqueta',
+        createdAt: typeof t.createdAt === 'number' ? t.createdAt : Date.now(),
+      }))
+    : []
+
+  const bookmarks = Array.isArray(data.bookmarks)
+    ? data.bookmarks.filter(isBookmark).map((b) => ({
+        id: b.id,
+        title: String(b.title).trim() || 'Sin título',
+        url: String(b.url).trim(),
+        folderId: b.folderId == null ? null : String(b.folderId),
+        tagIds: Array.isArray(b.tagIds)
+          ? b.tagIds.filter((id): id is string => typeof id === 'string')
+          : [],
+        notes: typeof b.notes === 'string' ? b.notes : '',
+        order: typeof b.order === 'number' ? b.order : 0,
+        createdAt: typeof b.createdAt === 'number' ? b.createdAt : Date.now(),
+        updatedAt: typeof b.updatedAt === 'number' ? b.updatedAt : Date.now(),
+      }))
+    : []
+
   return {
     accepted,
     rejected,
@@ -128,6 +184,9 @@ export function analyzeBackup(raw: unknown): ImportReport {
     tags,
     savedViews,
     attachments,
+    bookmarkFolders,
+    bookmarkTags,
+    bookmarks,
     version: version ?? 1,
   }
 }
@@ -141,10 +200,19 @@ export function downloadBackupJson(
   tags: Tag[] = [],
   savedViews: SavedView[] = [],
   attachments: AttachmentMeta[] = [],
+  bookmarkFolders: BookmarkFolder[] = [],
+  bookmarkTags: BookmarkTag[] = [],
+  bookmarks: Bookmark[] = [],
   filename = 'anotaciones-backup.json',
 ) {
   const blob = new Blob(
-    [JSON.stringify(buildBackup(pages, tags, savedViews, attachments), null, 2)],
+    [
+      JSON.stringify(
+        buildBackup(pages, tags, savedViews, attachments, bookmarkFolders, bookmarkTags, bookmarks),
+        null,
+        2,
+      ),
+    ],
     { type: 'application/json' },
   )
   const url = URL.createObjectURL(blob)
@@ -216,4 +284,21 @@ function parsePageEntry(entry: unknown): { page: Page } | { error: string } {
 
 function isTag(value: unknown): value is Tag {
   return !!value && typeof value === 'object' && typeof (value as Tag).id === 'string'
+}
+
+function isBookmarkFolder(value: unknown): value is BookmarkFolder {
+  return !!value && typeof value === 'object' && typeof (value as BookmarkFolder).id === 'string'
+}
+
+function isBookmarkTag(value: unknown): value is BookmarkTag {
+  return !!value && typeof value === 'object' && typeof (value as BookmarkTag).id === 'string'
+}
+
+function isBookmark(value: unknown): value is Bookmark {
+  return (
+    !!value &&
+    typeof value === 'object' &&
+    typeof (value as Bookmark).id === 'string' &&
+    typeof (value as Bookmark).url === 'string'
+  )
 }

@@ -8,14 +8,33 @@ import { downloadWikiExport } from '../../lib/wikiExport'
 import { Tooltip } from '../ui/Tooltip'
 
 export function SidebarBackup({ collapsed = false }: { collapsed?: boolean }) {
-  const { pages, allPages, tags, savedViews, attachments, importBackup, createPage, activePage } =
-    usePagesContext()
+  const {
+    pages,
+    allPages,
+    tags,
+    savedViews,
+    attachments,
+    bookmarkFolders,
+    bookmarkTags,
+    bookmarks,
+    importBackup,
+    createPage,
+    activePage,
+  } = usePagesContext()
   const inputRef = useRef<HTMLInputElement>(null)
   const mdRef = useRef<HTMLInputElement>(null)
   const [remind, setRemind] = useState(() => shouldRemindBackup())
 
   const exportAll = () => {
-    downloadBackupJson(allPages, tags, savedViews, attachments)
+    downloadBackupJson(
+      allPages,
+      tags,
+      savedViews,
+      attachments,
+      bookmarkFolders,
+      bookmarkTags,
+      bookmarks,
+    )
     markBackupExported()
     setRemind(false)
   }

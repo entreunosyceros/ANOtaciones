@@ -1,0 +1,10 @@
+[Desktop Entry]
+Name=ANOtaciones
+Comment=Notas, tableros y bases de datos locales
+Exec=/opt/anotaciones/anotaciones
+Icon=/opt/anotaciones/logo.png
+Terminal=false
+Type=Application
+Categories=Office;Utility;
+StartupWMClass=anotaciones
+Keywords=notas;wiki;kanban;tareas;

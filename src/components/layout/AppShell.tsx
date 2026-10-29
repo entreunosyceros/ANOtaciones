@@ -1,4 +1,5 @@
 import {
+  Bookmark,
   CalendarDays,
   CalendarRange,
   Inbox,
@@ -15,6 +16,7 @@ import { useState } from 'react'
 import { usePagesContext } from '../../context/PagesContext'
 import { useSidebarCollapsed } from '../../hooks/useSidebarCollapsed'
 import { useTheme } from '../../hooks/useTheme'
+import { BookmarksView } from '../bookmarks/BookmarksView'
 import { BlockEditor } from '../editor/BlockEditor'
 import { KanbanBoard } from '../board/KanbanBoard'
 import { DatabaseView } from '../database/DatabaseView'
@@ -30,7 +32,7 @@ import { DiagnosticsPanel } from './DiagnosticsPanel'
 import { ShortcutsHelp } from './ShortcutsHelp'
 import { WelcomePanel } from './WelcomePanel'
 
-type MainMode = 'page' | ProductivityMode | 'diagnostics'
+type MainMode = 'page' | ProductivityMode | 'diagnostics' | 'bookmarks'
 
 export function AppShell() {
   const { theme, toggle } = useTheme()
@@ -77,7 +79,7 @@ export function AppShell() {
   return (
     <div className="flex h-full bg-notion-bg text-notion-text">
       <aside
-        className={`flex shrink-0 flex-col border-r border-notion-border bg-notion-sidebar transition-[width] duration-200 ${
+        className={`flex shrink-0 flex-col overflow-hidden border-r border-notion-border bg-notion-sidebar transition-[width] duration-200 ${
           collapsed ? 'w-14' : 'w-60'
         }`}
       >
@@ -129,19 +131,23 @@ export function AppShell() {
             </Tooltip>
           </div>
         ) : (
-          <div className="flex items-center justify-between px-3 py-3">
-            <Tooltip content="Acerca de ANOtaciones" side="bottom">
+          <div className="flex min-w-0 items-center justify-between gap-1 px-3 py-3">
+            <Tooltip
+              content="Acerca de ANOtaciones"
+              side="bottom"
+              className="min-w-0 flex-1 overflow-hidden"
+            >
               <button
                 type="button"
                 onClick={() => setAboutOpen(true)}
-                className="flex min-w-0 items-center gap-2 rounded-md pr-1 hover:bg-notion-hover"
+                className="flex min-w-0 max-w-full items-center gap-2 rounded-md pr-1 hover:bg-notion-hover"
                 aria-label="Acerca de ANOtaciones"
               >
                 <img src="/logo.png" alt="" className="size-6 shrink-0 rounded object-contain" />
                 <span className="truncate text-sm font-semibold tracking-tight">ANOtaciones</span>
               </button>
             </Tooltip>
-            <div className="flex items-center gap-0.5">
+            <div className="flex shrink-0 items-center gap-0.5">
               <Tooltip content="Buscar páginas (Ctrl+K)">
                 <button
                   type="button"
@@ -193,6 +199,12 @@ export function AppShell() {
             mainMode === 'dashboard',
           )}
           {navBtn(
+            'Favoritos web',
+            Bookmark,
+            () => setMainMode('bookmarks'),
+            mainMode === 'bookmarks',
+          )}
+          {navBtn(
             'Diagnóstico',
             Stethoscope,
             () => setMainMode('diagnostics'),
@@ -221,6 +233,8 @@ export function AppShell() {
       <main className="min-w-0 flex-1 overflow-y-auto bg-notion-bg">
         {loading ? null : mainMode === 'diagnostics' ? (
           <DiagnosticsPanel />
+        ) : mainMode === 'bookmarks' ? (
+          <BookmarksView />
         ) : mainMode !== 'page' ? (
           <ProductivityViews mode={mainMode} onOpenPage={openPage} />
         ) : showWelcome ? (

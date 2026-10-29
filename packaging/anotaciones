@@ -1,0 +1,214 @@
+#!/usr/bin/env bash
+# Lanzador de escritorio para ANOtaciones (Ubuntu).
+# Sirve el build estático en 127.0.0.1, muestra icono en bandeja y abre el navegador en modo app.
+set -euo pipefail
+
+PORT="${ANOTACIONES_PORT:-8765}"
+URL="http://127.0.0.1:${PORT}"
+WM_CLASS="anotaciones"
+USER_DATA_DIR="${XDG_CONFIG_HOME:-$HOME/.config}/anotaciones-browser"
+# Si el navegador elegido es snap, el perfil debe vivir bajo ~/snap/<app>/common/
+
+SCRIPT_PATH="${BASH_SOURCE[0]}"
+if command -v readlink >/dev/null 2>&1; then
+  SCRIPT_PATH="$(readlink -f "$SCRIPT_PATH" 2>/dev/null || echo "$SCRIPT_PATH")"
+fi
+SCRIPT_DIR="$(cd "$(dirname "$SCRIPT_PATH")" && pwd)"
+APP_DIR="${ANOTACIONES_APP_DIR:-$SCRIPT_DIR}"
+WEB_DIR="${APP_DIR}/web"
+TRAY_PY="${APP_DIR}/anotaciones-tray.py"
+
+if [[ ! -d "$WEB_DIR" ]]; then
+  echo "ANOtaciones: no se encuentra el directorio web en ${WEB_DIR}" >&2
+  exit 1
+fi
+
+if ! command -v python3 >/dev/null 2>&1; then
+  echo "ANOtaciones: se necesita python3" >&2
+  exit 1
+fi
+
+export ANOTACIONES_APP_DIR="${APP_DIR}"
+export ANOTACIONES_PORT="${PORT}"
+
+port_in_use() {
+  python3 -c "import socket;s=socket.socket();s.settimeout(0.3);r=s.connect_ex(('127.0.0.1',${PORT}));s.close();raise SystemExit(0 if r==0 else 1)" 2>/dev/null
+}
+
+is_snap_path() {
+  [[ "$1" == /snap/* ]] || [[ "$1" == */snap/* ]]
+}
+
+find_browser() {
+  # Preferir Chrome/Brave/.deb frente a Chromium snap
+  local c path non_snap="" any=""
+  for c in google-chrome-stable google-chrome brave-browser chromium-browser chromium; do
+    path="$(command -v "$c" 2>/dev/null || true)"
+    [[ -n "$path" ]] || continue
+    if is_snap_path "$path"; then
+      [[ -z "$any" ]] && any="$path"
+    else
+      non_snap="$path"
+      break
+    fi
+  done
+  if [[ -n "$non_snap" ]]; then
+    printf '%s\n' "$non_snap"
+    return 0
+  fi
+  if [[ -n "$any" ]]; then
+    printf '%s\n' "$any"
+    return 0
+  fi
+  return 1
+}
+
+browser_user_data_dir() {
+  local browser="$1"
+  if is_snap_path "$browser"; then
+    local snap_name=chromium
+    case "$browser" in
+      *brave*) snap_name=brave ;;
+    esac
+    printf '%s\n' "${HOME}/snap/${snap_name}/common/anotaciones-browser"
+  else
+    printf '%s\n' "${USER_DATA_DIR}"
+  fi
+}
+
+focus_window() {
+  if command -v wmctrl >/dev/null 2>&1; then
+    if wmctrl -xa "${WM_CLASS}" 2>/dev/null; then
+      return 0
+    fi
+    local line wid
+    while IFS= read -r line; do
+      if printf '%s\n' "$line" | grep -qi "${WM_CLASS}"; then
+        wid="$(printf '%s\n' "$line" | awk '{print $1}')"
+        wmctrl -ia "$wid" 2>/dev/null && return 0
+      fi
+    done < <(wmctrl -lx 2>/dev/null || true)
+  fi
+  if command -v xdotool >/dev/null 2>&1; then
+    local wid
+    wid="$(xdotool search --class "${WM_CLASS}" 2>/dev/null | head -n1 || true)"
+    if [[ -n "${wid}" ]]; then
+      xdotool windowactivate --sync "${wid}" 2>/dev/null && return 0
+    fi
+  fi
+  return 1
+}
+
+launch_browser() {
+  local browser="" data_dir=""
+  if browser="$(find_browser)"; then
+    data_dir="$(browser_user_data_dir "$browser")"
+    mkdir -p "${data_dir}"
+    "$browser" \
+      --user-data-dir="${data_dir}" \
+      --app="${URL}" \
+      --class="${WM_CLASS}" \
+      --name="${WM_CLASS}" \
+      --no-first-run \
+      --no-default-browser-check \
+      >/dev/null 2>&1 &
+    return 0
+  fi
+  if command -v xdg-open >/dev/null 2>&1; then
+    xdg-open "${URL}" >/dev/null 2>&1 || true
+    return 0
+  fi
+  echo "ANOtaciones: instala Chromium/Chrome o un navegador con xdg-open" >&2
+  echo "Abre manualmente: ${URL}" >&2
+  return 1
+}
+
+# Segunda instancia / Abrir: enfocar; solo lanzar si no hay ventana.
+open_or_focus() {
+  if focus_window; then
+    return 0
+  fi
+  launch_browser || true
+}
+
+tray_available() {
+  [[ -f "${TRAY_PY}" ]] || return 1
+  python3 - <<'PY' 2>/dev/null
+import gi
+gi.require_version("Gtk", "3.0")
+try:
+    gi.require_version("AyatanaAppIndicator3", "0.1")
+except ValueError:
+    gi.require_version("AppIndicator3", "0.1")
+PY
+}
+
+SERVER_PID=""
+STARTED_SERVER=0
+TRAY_PID=""
+
+cleanup() {
+  if [[ -n "${TRAY_PID}" ]]; then
+    kill "${TRAY_PID}" 2>/dev/null || true
+    wait "${TRAY_PID}" 2>/dev/null || true
+  fi
+  if [[ "${STARTED_SERVER}" -eq 1 && -n "${SERVER_PID}" ]]; then
+    kill "${SERVER_PID}" 2>/dev/null || true
+    wait "${SERVER_PID}" 2>/dev/null || true
+  fi
+}
+trap cleanup EXIT INT TERM
+
+if port_in_use; then
+  # Ya hay instancia: enfocar ventana existente (sin segundo tray / sin ventana rota)
+  open_or_focus
+  trap - EXIT INT TERM
+  exit 0
+fi
+
+python3 -m http.server "${PORT}" --bind 127.0.0.1 --directory "${WEB_DIR}" >/dev/null 2>&1 &
+SERVER_PID=$!
+STARTED_SERVER=1
+export ANOTACIONES_SERVER_PID="${SERVER_PID}"
+
+for _ in $(seq 1 50); do
+  if port_in_use; then
+    break
+  fi
+  sleep 0.05
+done
+
+if ! port_in_use; then
+  echo "ANOtaciones: el servidor local no arrancó en el puerto ${PORT}" >&2
+  exit 1
+fi
+
+if tray_available; then
+  # El tray abre el navegador y mantiene el ciclo de vida (Abrir / Salir)
+  python3 "${TRAY_PY}" &
+  TRAY_PID=$!
+  wait "${TRAY_PID}" 2>/dev/null || true
+  TRAY_PID=""
+else
+  echo "ANOtaciones: bandeja no disponible (python3-gi / AppIndicator). Abriendo solo la ventana." >&2
+  if browser="$(find_browser)"; then
+    data_dir="$(browser_user_data_dir "$browser")"
+    mkdir -p "${data_dir}"
+    "${browser}" \
+      --user-data-dir="${data_dir}" \
+      --app="${URL}" \
+      --class="${WM_CLASS}" \
+      --name="${WM_CLASS}" \
+      --no-first-run \
+      --no-default-browser-check \
+      || true
+  elif command -v xdg-open >/dev/null 2>&1; then
+    xdg-open "${URL}" >/dev/null 2>&1 || true
+    while port_in_use; do
+      sleep 30
+    done
+  else
+    echo "Abre manualmente: ${URL}" >&2
+    exit 1
+  fi
+fi

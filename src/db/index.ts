@@ -19,6 +19,9 @@ import {
   defaultDatabaseViews,
   isLivePage,
   type AttachmentMeta,
+  type Bookmark,
+  type BookmarkFolder,
+  type BookmarkTag,
   type Page,
   type PageKind,
   type PageRevision,
@@ -62,12 +65,51 @@ export function normalizeTag(raw: Partial<Tag> & Pick<Tag, 'id'>): Tag {
   }
 }
 
+export function normalizeBookmarkFolder(
+  raw: Partial<BookmarkFolder> & Pick<BookmarkFolder, 'id'>,
+): BookmarkFolder {
+  return {
+    id: raw.id,
+    name: raw.name?.trim() || 'Carpeta',
+    parentId: raw.parentId ?? null,
+    order: raw.order ?? 0,
+    createdAt: raw.createdAt ?? Date.now(),
+  }
+}
+
+export function normalizeBookmarkTag(
+  raw: Partial<BookmarkTag> & Pick<BookmarkTag, 'id'>,
+): BookmarkTag {
+  return {
+    id: raw.id,
+    name: raw.name?.trim() || 'etiqueta',
+    createdAt: raw.createdAt ?? Date.now(),
+  }
+}
+
+export function normalizeBookmark(raw: Partial<Bookmark> & Pick<Bookmark, 'id'>): Bookmark {
+  return {
+    id: raw.id,
+    title: raw.title?.trim() || 'Sin título',
+    url: raw.url?.trim() || '',
+    folderId: raw.folderId ?? null,
+    tagIds: Array.isArray(raw.tagIds) ? [...raw.tagIds] : [],
+    notes: raw.notes?.trim() || '',
+    order: raw.order ?? 0,
+    createdAt: raw.createdAt ?? Date.now(),
+    updatedAt: raw.updatedAt ?? Date.now(),
+  }
+}
+
 export class AnotacionDB extends Dexie {
   pages!: Table<Page, string>
   tags!: Table<Tag, string>
   savedViews!: Table<SavedView, string>
   attachments!: Table<AttachmentMeta, string>
   revisions!: Table<PageRevision, string>
+  bookmarkFolders!: Table<BookmarkFolder, string>
+  bookmarkTags!: Table<BookmarkTag, string>
+  bookmarks!: Table<Bookmark, string>
 
   constructor() {
     super('anotacion')
@@ -124,6 +166,17 @@ export class AnotacionDB extends Dexie {
       savedViews: 'id, scope, updatedAt',
       attachments: 'id, pageId, createdAt',
       revisions: 'id, pageId, createdAt',
+    })
+    // v7: URL bookmarks with folders + tags
+    this.version(7).stores({
+      pages: 'id, parentId, order, updatedAt, kind, isFavorite, deletedAt, isTemplate',
+      tags: 'id, name',
+      savedViews: 'id, scope, updatedAt',
+      attachments: 'id, pageId, createdAt',
+      revisions: 'id, pageId, createdAt',
+      bookmarkFolders: 'id, parentId, order',
+      bookmarkTags: 'id, name',
+      bookmarks: 'id, folderId, updatedAt',
     })
   }
 }
@@ -299,6 +352,9 @@ export async function importPages(
     tags?: Tag[]
     savedViews?: SavedView[]
     attachments?: AttachmentMeta[]
+    bookmarkFolders?: BookmarkFolder[]
+    bookmarkTags?: BookmarkTag[]
+    bookmarks?: Bookmark[]
   } = {},
 ): Promise<number> {
   const mode = options.mode ?? 'merge'
@@ -306,24 +362,38 @@ export async function importPages(
   const tags = (options.tags ?? []).map((t) => normalizeTag(t))
   const views = (options.savedViews ?? []).map((v) => normalizeSavedView(v))
   const attachments = options.attachments ?? []
+  const bookmarkFolders = (options.bookmarkFolders ?? []).map((f) => normalizeBookmarkFolder(f))
+  const bookmarkTags = (options.bookmarkTags ?? []).map((t) => normalizeBookmarkTag(t))
+  const bookmarks = (options.bookmarks ?? []).map((b) => normalizeBookmark(b))
 
   await db.transaction(
     'rw',
-    db.pages,
-    db.tags,
-    db.savedViews,
-    db.attachments,
+    [
+      db.pages,
+      db.tags,
+      db.savedViews,
+      db.attachments,
+      db.bookmarkFolders,
+      db.bookmarkTags,
+      db.bookmarks,
+    ],
     async () => {
       if (mode === 'replace') {
         await db.pages.clear()
         await db.tags.clear()
         await db.savedViews.clear()
         await db.attachments.clear()
+        await db.bookmarkFolders.clear()
+        await db.bookmarkTags.clear()
+        await db.bookmarks.clear()
       }
       if (normalized.length) await db.pages.bulkPut(normalized)
       if (tags.length) await db.tags.bulkPut(tags)
       if (views.length) await db.savedViews.bulkPut(views)
       if (attachments.length) await db.attachments.bulkPut(attachments)
+      if (bookmarkFolders.length) await db.bookmarkFolders.bulkPut(bookmarkFolders)
+      if (bookmarkTags.length) await db.bookmarkTags.bulkPut(bookmarkTags)
+      if (bookmarks.length) await db.bookmarks.bulkPut(bookmarks)
     },
   )
 
@@ -538,4 +608,161 @@ export async function restoreRevision(revisionId: string): Promise<Page | null> 
   })
   const page = await db.pages.get(rev.pageId)
   return page ? normalizePage(page) : null
+}
+
+// --- Bookmarks (URLs) ---
+
+export async function getAllBookmarkFolders(): Promise<BookmarkFolder[]> {
+  return (await db.bookmarkFolders.toArray())
+    .map((f) => normalizeBookmarkFolder(f))
+    .sort((a, b) => a.order - b.order || a.name.localeCompare(b.name))
+}
+
+export async function getAllBookmarkTags(): Promise<BookmarkTag[]> {
+  return (await db.bookmarkTags.toArray())
+    .map((t) => normalizeBookmarkTag(t))
+    .sort((a, b) => a.name.localeCompare(b.name))
+}
+
+export async function getAllBookmarks(): Promise<Bookmark[]> {
+  return (await db.bookmarks.toArray())
+    .map((b) => normalizeBookmark(b))
+    .sort((a, b) => a.order - b.order || a.title.localeCompare(b.title))
+}
+
+export async function createBookmarkFolder(input: {
+  name: string
+  parentId?: string | null
+}): Promise<BookmarkFolder> {
+  const peers = await db.bookmarkFolders
+    .filter((f) => f.parentId === (input.parentId ?? null))
+    .toArray()
+  const order = peers.reduce((max, f) => Math.max(max, f.order), -1) + 1
+  const folder: BookmarkFolder = {
+    id: createId(),
+    name: input.name.trim() || 'Carpeta',
+    parentId: input.parentId ?? null,
+    order,
+    createdAt: Date.now(),
+  }
+  await db.bookmarkFolders.add(folder)
+  return folder
+}
+
+export async function updateBookmarkFolder(
+  id: string,
+  patch: Partial<Pick<BookmarkFolder, 'name' | 'parentId' | 'order'>>,
+): Promise<void> {
+  await db.bookmarkFolders.update(id, {
+    ...patch,
+    ...(patch.name != null ? { name: patch.name.trim() || 'Carpeta' } : {}),
+  })
+}
+
+/** Borrar carpeta: bookmarks pasan a sin carpeta; subcarpetas suben a parentId de la borrada. */
+export async function deleteBookmarkFolder(id: string): Promise<void> {
+  const folder = await db.bookmarkFolders.get(id)
+  if (!folder) return
+  await db.transaction('rw', db.bookmarkFolders, db.bookmarks, async () => {
+    const children = await db.bookmarkFolders.where('parentId').equals(id).toArray()
+    for (const child of children) {
+      await db.bookmarkFolders.update(child.id, { parentId: folder.parentId })
+    }
+    const marks = await db.bookmarks.where('folderId').equals(id).toArray()
+    for (const bm of marks) {
+      await db.bookmarks.update(bm.id, { folderId: null, updatedAt: Date.now() })
+    }
+    await db.bookmarkFolders.delete(id)
+  })
+}
+
+export async function createBookmarkTag(name: string): Promise<BookmarkTag> {
+  const trimmed = name.trim()
+  if (!trimmed) throw new Error('Nombre de etiqueta vacío')
+  const existing = await getAllBookmarkTags()
+  const dup = existing.find((t) => t.name.toLowerCase() === trimmed.toLowerCase())
+  if (dup) return dup
+  const tag: BookmarkTag = { id: createId(), name: trimmed, createdAt: Date.now() }
+  await db.bookmarkTags.add(tag)
+  return tag
+}
+
+export async function renameBookmarkTag(id: string, name: string): Promise<void> {
+  await db.bookmarkTags.update(id, { name: name.trim() || 'etiqueta' })
+}
+
+export async function deleteBookmarkTag(id: string): Promise<void> {
+  await db.transaction('rw', db.bookmarkTags, db.bookmarks, async () => {
+    await db.bookmarkTags.delete(id)
+    const marks = await db.bookmarks.toArray()
+    for (const bm of marks) {
+      const tagIds = bm.tagIds ?? []
+      if (!tagIds.includes(id)) continue
+      await db.bookmarks.update(bm.id, {
+        tagIds: tagIds.filter((t) => t !== id),
+        updatedAt: Date.now(),
+      })
+    }
+  })
+}
+
+export function isValidBookmarkUrl(url: string): boolean {
+  try {
+    const u = new URL(url.trim())
+    return u.protocol === 'http:' || u.protocol === 'https:'
+  } catch {
+    return false
+  }
+}
+
+export async function createBookmark(input: {
+  title: string
+  url: string
+  folderId?: string | null
+  tagIds?: string[]
+  notes?: string
+}): Promise<Bookmark> {
+  const url = input.url.trim()
+  if (!isValidBookmarkUrl(url)) throw new Error('URL inválida (usa http:// o https://)')
+  const folderId = input.folderId ?? null
+  const peers =
+    folderId == null
+      ? await db.bookmarks.filter((b) => b.folderId == null).toArray()
+      : await db.bookmarks.where('folderId').equals(folderId).toArray()
+  const order = peers.reduce((max, b) => Math.max(max, b.order), -1) + 1
+  const now = Date.now()
+  const bookmark: Bookmark = {
+    id: createId(),
+    title: input.title.trim() || url,
+    url,
+    folderId,
+    tagIds: [...new Set(input.tagIds ?? [])],
+    notes: input.notes?.trim() || '',
+    order,
+    createdAt: now,
+    updatedAt: now,
+  }
+  await db.bookmarks.add(bookmark)
+  return bookmark
+}
+
+export async function updateBookmark(
+  id: string,
+  patch: Partial<Pick<Bookmark, 'title' | 'url' | 'folderId' | 'tagIds' | 'notes' | 'order'>>,
+): Promise<void> {
+  if (patch.url != null && !isValidBookmarkUrl(patch.url)) {
+    throw new Error('URL inválida (usa http:// o https://)')
+  }
+  await db.bookmarks.update(id, {
+    ...patch,
+    ...(patch.url != null ? { url: patch.url.trim() } : {}),
+    ...(patch.title != null ? { title: patch.title.trim() || 'Sin título' } : {}),
+    ...(patch.notes != null ? { notes: patch.notes.trim() } : {}),
+    ...(patch.tagIds != null ? { tagIds: [...new Set(patch.tagIds)] } : {}),
+    updatedAt: Date.now(),
+  })
+}
+
+export async function deleteBookmark(id: string): Promise<void> {
+  await db.bookmarks.delete(id)
 }

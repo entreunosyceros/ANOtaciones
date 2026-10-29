@@ -62,6 +62,34 @@ export interface Tag {
   createdAt: number
 }
 
+/** Carpeta de URLs favoritas (independiente del árbol de páginas). */
+export interface BookmarkFolder {
+  id: string
+  name: string
+  parentId: string | null
+  order: number
+  createdAt: number
+}
+
+/** Etiqueta solo para bookmarks (no mezclar con Tag de páginas). */
+export interface BookmarkTag {
+  id: string
+  name: string
+  createdAt: number
+}
+
+export interface Bookmark {
+  id: string
+  title: string
+  url: string
+  folderId: string | null
+  tagIds: string[]
+  notes?: string
+  order: number
+  createdAt: number
+  updatedAt: number
+}
+
 export type SavedViewScope = 'tasks' | 'dashboard'
 
 export type TaskPriority = 'low' | 'medium' | 'high'

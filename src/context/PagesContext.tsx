@@ -9,31 +9,46 @@ import {
 } from 'react'
 import {
   addRevision,
+  createBookmark as dbCreateBookmark,
+  createBookmarkFolder as dbCreateBookmarkFolder,
+  createBookmarkTag as dbCreateBookmarkTag,
   createInboxTask as dbCreateInboxTask,
   createPage as dbCreatePage,
   createPageFromTemplate as dbCreateFromTemplate,
   createTag as dbCreateTag,
+  deleteBookmark as dbDeleteBookmark,
+  deleteBookmarkFolder as dbDeleteBookmarkFolder,
+  deleteBookmarkTag as dbDeleteBookmarkTag,
   deleteSavedView as dbDeleteSavedView,
   deleteTag as dbDeleteTag,
   duplicatePage as dbDuplicatePage,
   ensureBootstrapPage,
   getAllAttachments,
+  getAllBookmarkFolders,
+  getAllBookmarks,
+  getAllBookmarkTags,
   getAllPages,
   getAllSavedViews,
   getAllTags,
   importPages,
   listRevisions as dbListRevisions,
   purgeTrash as dbPurgeTrash,
+  renameBookmarkTag as dbRenameBookmarkTag,
   restorePages as dbRestorePages,
   restoreRevision as dbRestoreRevision,
   setPageTagIds as dbSetPageTagIds,
   softDeletePageCascade,
   syncPageLinkTitles,
+  updateBookmark as dbUpdateBookmark,
+  updateBookmarkFolder as dbUpdateBookmarkFolder,
   updatePage,
   upsertSavedView as dbUpsertSavedView,
 } from '../db'
 import type {
   AttachmentMeta,
+  Bookmark,
+  BookmarkFolder,
+  BookmarkTag,
   Page,
   PageKind,
   PageNode,
@@ -102,6 +117,30 @@ interface PagesContextValue {
   refresh: () => Promise<void>
   savedViews: SavedView[]
   attachments: AttachmentMeta[]
+  bookmarkFolders: BookmarkFolder[]
+  bookmarkTags: BookmarkTag[]
+  bookmarks: Bookmark[]
+  createBookmarkFolder: (input: { name: string; parentId?: string | null }) => Promise<BookmarkFolder>
+  updateBookmarkFolder: (
+    id: string,
+    patch: Partial<Pick<BookmarkFolder, 'name' | 'parentId' | 'order'>>,
+  ) => Promise<void>
+  deleteBookmarkFolder: (id: string) => Promise<void>
+  createBookmarkTag: (name: string) => Promise<BookmarkTag>
+  renameBookmarkTag: (id: string, name: string) => Promise<void>
+  deleteBookmarkTag: (id: string) => Promise<void>
+  createBookmark: (input: {
+    title: string
+    url: string
+    folderId?: string | null
+    tagIds?: string[]
+    notes?: string
+  }) => Promise<Bookmark>
+  updateBookmark: (
+    id: string,
+    patch: Partial<Pick<Bookmark, 'title' | 'url' | 'folderId' | 'tagIds' | 'notes' | 'order'>>,
+  ) => Promise<void>
+  deleteBookmark: (id: string) => Promise<void>
   createInboxTask: (input: {
     title: string
     due?: string | null
@@ -129,38 +168,55 @@ export function PagesProvider({ children }: { children: ReactNode }) {
   const [tags, setTags] = useState<Tag[]>([])
   const [savedViews, setSavedViews] = useState<SavedView[]>([])
   const [attachments, setAttachments] = useState<AttachmentMeta[]>([])
+  const [bookmarkFolders, setBookmarkFolders] = useState<BookmarkFolder[]>([])
+  const [bookmarkTags, setBookmarkTags] = useState<BookmarkTag[]>([])
+  const [bookmarks, setBookmarks] = useState<Bookmark[]>([])
   const [activePageId, setActivePageIdState] = useState<string | null>(null)
   const [recentIds, setRecentIds] = useState<string[]>(() => readRecentIds())
   const [loading, setLoading] = useState(true)
 
   const refresh = useCallback(async () => {
-    const [pagesRows, tagRows, viewRows, attRows] = await Promise.all([
-      getAllPages(),
-      getAllTags(),
-      getAllSavedViews(),
-      getAllAttachments(),
-    ])
+    const [pagesRows, tagRows, viewRows, attRows, folderRows, bmTagRows, bmRows] =
+      await Promise.all([
+        getAllPages(),
+        getAllTags(),
+        getAllSavedViews(),
+        getAllAttachments(),
+        getAllBookmarkFolders(),
+        getAllBookmarkTags(),
+        getAllBookmarks(),
+      ])
     setAllPages(pagesRows)
     setTags(tagRows)
     setSavedViews(viewRows)
     setAttachments(attRows)
+    setBookmarkFolders(folderRows)
+    setBookmarkTags(bmTagRows)
+    setBookmarks(bmRows)
   }, [])
 
   useEffect(() => {
     let cancelled = false
     ;(async () => {
       await ensureBootstrapPage()
-      const [pagesRows, tagRows, viewRows, attRows] = await Promise.all([
-        getAllPages(),
-        getAllTags(),
-        getAllSavedViews(),
-        getAllAttachments(),
-      ])
+      const [pagesRows, tagRows, viewRows, attRows, folderRows, bmTagRows, bmRows] =
+        await Promise.all([
+          getAllPages(),
+          getAllTags(),
+          getAllSavedViews(),
+          getAllAttachments(),
+          getAllBookmarkFolders(),
+          getAllBookmarkTags(),
+          getAllBookmarks(),
+        ])
       if (cancelled) return
       setAllPages(pagesRows)
       setTags(tagRows)
       setSavedViews(viewRows)
       setAttachments(attRows)
+      setBookmarkFolders(folderRows)
+      setBookmarkTags(bmTagRows)
+      setBookmarks(bmRows)
       const stored = localStorage.getItem(ACTIVE_KEY)
       const next = pickActiveId(pagesRows, stored)
       setActivePageIdState(next)
@@ -357,6 +413,9 @@ export function PagesProvider({ children }: { children: ReactNode }) {
         tags: report.tags,
         savedViews: report.savedViews,
         attachments: report.attachments,
+        bookmarkFolders: report.bookmarkFolders,
+        bookmarkTags: report.bookmarkTags,
+        bookmarks: report.bookmarks,
       })
       await refresh()
       let rows = await getAllPages()
@@ -370,6 +429,93 @@ export function PagesProvider({ children }: { children: ReactNode }) {
       return report
     },
     [refresh, activePageId, setActivePageId],
+  )
+
+  const createBookmarkFolder = useCallback(
+    async (input: { name: string; parentId?: string | null }) => {
+      const folder = await dbCreateBookmarkFolder(input)
+      await refresh()
+      return folder
+    },
+    [refresh],
+  )
+
+  const updateBookmarkFolderFn = useCallback(
+    async (
+      id: string,
+      patch: Partial<Pick<BookmarkFolder, 'name' | 'parentId' | 'order'>>,
+    ) => {
+      await dbUpdateBookmarkFolder(id, patch)
+      await refresh()
+    },
+    [refresh],
+  )
+
+  const deleteBookmarkFolderFn = useCallback(
+    async (id: string) => {
+      await dbDeleteBookmarkFolder(id)
+      await refresh()
+    },
+    [refresh],
+  )
+
+  const createBookmarkTagFn = useCallback(
+    async (name: string) => {
+      const tag = await dbCreateBookmarkTag(name)
+      await refresh()
+      return tag
+    },
+    [refresh],
+  )
+
+  const renameBookmarkTagFn = useCallback(
+    async (id: string, name: string) => {
+      await dbRenameBookmarkTag(id, name)
+      await refresh()
+    },
+    [refresh],
+  )
+
+  const deleteBookmarkTagFn = useCallback(
+    async (id: string) => {
+      await dbDeleteBookmarkTag(id)
+      await refresh()
+    },
+    [refresh],
+  )
+
+  const createBookmarkFn = useCallback(
+    async (input: {
+      title: string
+      url: string
+      folderId?: string | null
+      tagIds?: string[]
+      notes?: string
+    }) => {
+      const bm = await dbCreateBookmark(input)
+      await refresh()
+      return bm
+    },
+    [refresh],
+  )
+
+  const updateBookmarkFn = useCallback(
+    async (
+      id: string,
+      patch: Partial<Pick<Bookmark, 'title' | 'url' | 'folderId' | 'tagIds' | 'notes' | 'order'>>,
+    ) => {
+      await dbUpdateBookmark(id, patch)
+      await refresh()
+    },
+    [refresh],
+  )
+
+  const deleteBookmarkFn = useCallback(
+    async (id: string) => {
+      await dbDeleteBookmark(id)
+      await refresh()
+    },
+    [refresh],
   )
 
   const createInboxTask = useCallback(
@@ -541,6 +687,18 @@ export function PagesProvider({ children }: { children: ReactNode }) {
       refresh,
       savedViews,
       attachments,
+      bookmarkFolders,
+      bookmarkTags,
+      bookmarks,
+      createBookmarkFolder,
+      updateBookmarkFolder: updateBookmarkFolderFn,
+      deleteBookmarkFolder: deleteBookmarkFolderFn,
+      createBookmarkTag: createBookmarkTagFn,
+      renameBookmarkTag: renameBookmarkTagFn,
+      deleteBookmarkTag: deleteBookmarkTagFn,
+      createBookmark: createBookmarkFn,
+      updateBookmark: updateBookmarkFn,
+      deleteBookmark: deleteBookmarkFn,
       createInboxTask,
       saveView,
       deleteView,
@@ -582,6 +740,18 @@ export function PagesProvider({ children }: { children: ReactNode }) {
       refresh,
       savedViews,
       attachments,
+      bookmarkFolders,
+      bookmarkTags,
+      bookmarks,
+      createBookmarkFolder,
+      updateBookmarkFolderFn,
+      deleteBookmarkFolderFn,
+      createBookmarkTagFn,
+      renameBookmarkTagFn,
+      deleteBookmarkTagFn,
+      createBookmarkFn,
+      updateBookmarkFn,
+      deleteBookmarkFn,
       createInboxTask,
       saveView,
       deleteView,

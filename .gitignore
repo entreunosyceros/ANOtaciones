@@ -1,29 +1,60 @@
-# Logs
-logs
+# Dependencias
+node_modules/
+
+# Builds y empaquetado (se regeneran con npm run build / pack:linux / pack:deb)
+dist/
+dist-ssr/
+release/
+*.deb
+
+# Cachés de herramientas
+.vite/
+*.tsbuildinfo
+.cache/
+.turbo/
+.eslintcache
+.oxlintcache
+
+# Entorno y secretos locales
+.env
+.env.*
+!.env.example
+*.local
+*.pem
+credentials*.json
+
+# Logs y depuración
+logs/
 *.log
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 pnpm-debug.log*
 lerna-debug.log*
+chrome-launch-*.err
 
-node_modules
-dist
-dist-ssr
-*.local
+# Sistema operativo
+.DS_Store
+Thumbs.db
+Desktop.ini
+*~
 
-# Editor directories and files
+# Editores
 .vscode/*
 !.vscode/extensions.json
-.idea
-.DS_Store
+.idea/
 *.suo
 *.ntvs*
 *.njsproj
 *.sln
 *.sw?
 
-# Cursor / Superpowers (usados en este proyecto)
+# Cobertura / tests locales
+coverage/
+*.lcov
+playwright-report/
+test-results/
+
 .cursor/
 .superpowers/
 docs/superpowers/
