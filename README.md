@@ -11,11 +11,18 @@ Espacio local tipo Notion para notas, tableros Kanban, bases de datos y favorito
 
 ## Características
 
+
+<p align="center">
+  
+<img width="1918" height="1045" alt="about-anotaciones" src="https://github.com/user-attachments/assets/dcaddf33-9356-447c-a2bd-563e7888b0b2" />
+
+</p>
+
 ### Notas y wiki
 
 <p align="center">
 
-<img width="1919" height="934" alt="anotaciones" src="https://github.com/user-attachments/assets/199bc48f-4874-48d1-90ed-66767361696b" />
+<img width="1919" height="1047" alt="tablero" src="https://github.com/user-attachments/assets/d58003be-bf3c-4f56-82d4-59f24f445d3a" />
 
 </p>
 
@@ -43,6 +50,12 @@ Espacio local tipo Notion para notas, tableros Kanban, bases de datos y favorito
 
 ### Favoritos web
 
+<p align="center">
+
+<img width="1916" height="1044" alt="gestión_enlaces" src="https://github.com/user-attachments/assets/c7c8c286-9969-436e-b693-c621546f2f6e" />
+
+</p>
+
 Vista propia en la barra lateral (**Favoritos web**), independiente de los favoritos de página:
 
 - Guardar URLs (`http` / `https`) con título, notas, carpeta y etiquetas
@@ -54,7 +67,9 @@ Vista propia en la barra lateral (**Favoritos web**), independiente de los favor
 ### Tableros y bases de datos
 
 <p align="center">
-<img width="1919" height="932" alt="atajos-teclado" src="https://github.com/user-attachments/assets/7dd8b4ff-25c9-4478-840c-109084aa598d" />
+  
+<img width="1918" height="1046" alt="nota-dia" src="https://github.com/user-attachments/assets/cc85e176-da0c-4ef3-a64a-560f70df32e4" />
+
 </p>
 
 - Tablero Kanban (Backlog / Doing / Done) con drag-and-drop
@@ -95,6 +110,12 @@ npm run dev
 | `npm run pack:deb` | Empaqueta y genera el `.deb` |
 
 ## Instalación en Ubuntu
+
+<p align="center">
+  
+<img width="1918" height="1046" alt="atajos-teclado" src="https://github.com/user-attachments/assets/f95fe1b0-eebb-417d-ade4-0faade4a8882" />
+
+</p>
 
 Empaquetado ligero: el build estático se sirve en `localhost` con Python 3, se muestra un **icono en la bandeja del sistema** (Abrir / Salir) y se abre el navegador en **modo aplicación** (ventana sin pestañas). No hace falta Node.js en el PC donde solo se usa la app.
 
@@ -156,4 +177,4 @@ Opcional para enfocar ventanas: `wmctrl` o `xdotool`.
 
 ## Fuera de alcance
 
-IA, sync cloud, fórmulas entre distintas bases de datos, arrastre de tareas entre días del calendario, favicons automáticos / import Netscape de favoritos web.
+IA, sync cloud, fórmulas entre distintas bases de datos, arrastre de tareas entre días del calendario, favicons automáticos.
