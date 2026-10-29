@@ -1,14 +1,58 @@
 import { RotateCcw, Trash2 } from 'lucide-react'
-import { useState } from 'react'
+import { useEffect, useLayoutEffect, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
 import { usePagesContext } from '../../context/PagesContext'
 import { Tooltip } from '../ui/Tooltip'
 
 export function TrashPanel({ collapsed = false }: { collapsed?: boolean }) {
   const { trashPages, restorePages, purgeTrash } = usePagesContext()
   const [open, setOpen] = useState(false)
+  const rootRef = useRef<HTMLDivElement>(null)
+  const btnRef = useRef<HTMLButtonElement>(null)
+  const flyoutRef = useRef<HTMLDivElement>(null)
+  const [flyPos, setFlyPos] = useState<{ bottom: number; left: number } | null>(null)
+
+  useEffect(() => {
+    if (!collapsed) setOpen(false)
+  }, [collapsed])
+
+  useLayoutEffect(() => {
+    if (!open || !collapsed || !btnRef.current) {
+      setFlyPos(null)
+      return
+    }
+    const place = () => {
+      const r = btnRef.current!.getBoundingClientRect()
+      setFlyPos({
+        bottom: Math.max(8, window.innerHeight - r.bottom),
+        left: r.right + 4,
+      })
+    }
+    place()
+    window.addEventListener('resize', place)
+    return () => window.removeEventListener('resize', place)
+  }, [open, collapsed])
+
+  useEffect(() => {
+    if (!open || !collapsed) return
+    const onDoc = (e: MouseEvent) => {
+      const t = e.target as Node
+      if (rootRef.current?.contains(t) || flyoutRef.current?.contains(t)) return
+      setOpen(false)
+    }
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setOpen(false)
+    }
+    document.addEventListener('mousedown', onDoc)
+    window.addEventListener('keydown', onKey)
+    return () => {
+      document.removeEventListener('mousedown', onDoc)
+      window.removeEventListener('keydown', onKey)
+    }
+  }, [open, collapsed])
 
   const list = (
-    <div className={`mt-1 max-h-40 space-y-1 overflow-y-auto ${collapsed ? 'w-52 p-1' : ''}`}>
+    <div className={`max-h-40 space-y-1 overflow-y-auto ${collapsed ? 'w-52 p-1' : 'mt-1'}`}>
       {trashPages.length === 0 ? (
         <p className="px-2 py-1 text-[11px] text-notion-text/45">Vacía</p>
       ) : (
@@ -61,22 +105,39 @@ export function TrashPanel({ collapsed = false }: { collapsed?: boolean }) {
 
   if (collapsed) {
     return (
-      <div className="relative flex flex-col items-center border-t border-notion-border py-2">
+      <div
+        ref={rootRef}
+        className="relative flex flex-col items-center border-t border-notion-border py-2"
+      >
         <Tooltip content={`Papelera (${trashPages.length})`} side="right">
           <button
+            ref={btnRef}
             type="button"
             aria-label={`Papelera (${trashPages.length})`}
+            aria-expanded={open}
             className="flex size-9 items-center justify-center rounded-md text-notion-text/70 hover:bg-notion-hover"
             onClick={() => setOpen((v) => !v)}
           >
             <Trash2 className="size-4" />
           </button>
         </Tooltip>
-        {open && (
-          <div className="absolute bottom-0 left-full z-30 ml-1 rounded-md border border-notion-border bg-notion-bg shadow-lg">
-            {list}
-          </div>
-        )}
+        {open &&
+          flyPos &&
+          createPortal(
+            <div
+              ref={flyoutRef}
+              style={{
+                position: 'fixed',
+                bottom: flyPos.bottom,
+                left: flyPos.left,
+                zIndex: 80,
+              }}
+              className="rounded-md border border-notion-border bg-notion-bg shadow-lg"
+            >
+              {list}
+            </div>,
+            document.body,
+          )}
       </div>
     )
   }

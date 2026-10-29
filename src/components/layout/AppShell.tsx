@@ -77,157 +77,168 @@ export function AppShell() {
   }
 
   return (
-    <div className="flex h-full bg-notion-bg text-notion-text">
+    <div className="flex h-full min-h-0 overflow-hidden bg-notion-bg text-notion-text">
       <aside
-        className={`flex shrink-0 flex-col overflow-hidden border-r border-notion-border bg-notion-sidebar transition-[width] duration-200 ${
+        className={`relative z-20 flex h-full min-h-0 shrink-0 flex-col overflow-x-hidden border-r border-notion-border bg-notion-sidebar transition-[width] duration-200 ${
           collapsed ? 'w-14' : 'w-60'
         }`}
       >
-        {collapsed ? (
-          <div className="flex flex-col items-center gap-1 px-1 py-2">
-            <Tooltip content="Acerca de ANOtaciones" side={tipSide}>
-              <button
-                type="button"
-                onClick={() => setAboutOpen(true)}
-                className="flex size-9 items-center justify-center rounded-md hover:bg-notion-hover"
-                aria-label="Acerca de ANOtaciones"
-              >
-                <img src="/logo.png" alt="" className="size-6 rounded object-contain" />
-              </button>
-            </Tooltip>
-            <Tooltip content="Expandir barra lateral" side={tipSide}>
-              <button
-                type="button"
-                onClick={toggleSidebar}
-                className="flex size-9 items-center justify-center rounded-md text-notion-text/70 hover:bg-notion-hover"
-                aria-label="Expandir barra lateral"
-              >
-                <PanelLeftOpen className="size-4" />
-              </button>
-            </Tooltip>
-            <Tooltip content="Buscar páginas (Ctrl+K)" side={tipSide}>
-              <button
-                type="button"
-                aria-label="Buscar páginas (Ctrl+K)"
-                className="flex size-9 items-center justify-center rounded-md text-notion-text/70 hover:bg-notion-hover"
-                onClick={() => window.dispatchEvent(new Event('anotacion:open-search'))}
-              >
-                <Search className="size-4" />
-              </button>
-            </Tooltip>
-            <ShortcutsHelp tipSide={tipSide} />
-            <Tooltip
-              content={theme === 'dark' ? 'Cambiar a modo claro' : 'Cambiar a modo oscuro'}
-              side={tipSide}
-            >
-              <button
-                type="button"
-                onClick={toggle}
-                aria-label={theme === 'dark' ? 'Cambiar a modo claro' : 'Cambiar a modo oscuro'}
-                className="flex size-9 items-center justify-center rounded-md text-notion-text/70 hover:bg-notion-hover"
-              >
-                {theme === 'dark' ? <Sun className="size-4" /> : <Moon className="size-4" />}
-              </button>
-            </Tooltip>
-          </div>
-        ) : (
-          <div className="flex min-w-0 items-center justify-between gap-1 px-3 py-3">
-            <Tooltip
-              content="Acerca de ANOtaciones"
-              side="bottom"
-              className="min-w-0 flex-1 overflow-hidden"
-            >
-              <button
-                type="button"
-                onClick={() => setAboutOpen(true)}
-                className="flex min-w-0 max-w-full items-center gap-2 rounded-md pr-1 hover:bg-notion-hover"
-                aria-label="Acerca de ANOtaciones"
-              >
-                <img src="/logo.png" alt="" className="size-6 shrink-0 rounded object-contain" />
-                <span className="truncate text-sm font-semibold tracking-tight">ANOtaciones</span>
-              </button>
-            </Tooltip>
-            <div className="flex shrink-0 items-center gap-0.5">
-              <Tooltip content="Buscar páginas (Ctrl+K)">
+        <div className="shrink-0">
+          {collapsed ? (
+            <div className="flex flex-col items-center gap-1 overflow-x-hidden px-1 py-2">
+              <Tooltip content="Acerca de ANOtaciones" side={tipSide}>
+                <button
+                  type="button"
+                  onClick={() => setAboutOpen(true)}
+                  className="flex size-9 items-center justify-center rounded-md hover:bg-notion-hover"
+                  aria-label="Acerca de ANOtaciones"
+                >
+                  <img src="/logo.png" alt="" className="size-6 rounded object-contain" />
+                </button>
+              </Tooltip>
+              <Tooltip content="Expandir barra lateral" side={tipSide}>
+                <button
+                  type="button"
+                  onClick={toggleSidebar}
+                  className="flex size-9 items-center justify-center rounded-md text-notion-text/70 hover:bg-notion-hover"
+                  aria-label="Expandir barra lateral"
+                >
+                  <PanelLeftOpen className="size-4" />
+                </button>
+              </Tooltip>
+              <Tooltip content="Buscar páginas (Ctrl+K)" side={tipSide}>
                 <button
                   type="button"
                   aria-label="Buscar páginas (Ctrl+K)"
-                  className="rounded-md p-1.5 text-notion-text/70 hover:bg-notion-hover"
+                  className="flex size-9 items-center justify-center rounded-md text-notion-text/70 hover:bg-notion-hover"
                   onClick={() => window.dispatchEvent(new Event('anotacion:open-search'))}
                 >
                   <Search className="size-4" />
                 </button>
               </Tooltip>
-              <ShortcutsHelp />
-              <Tooltip content={theme === 'dark' ? 'Cambiar a modo claro' : 'Cambiar a modo oscuro'}>
+              <ShortcutsHelp tipSide={tipSide} />
+              <Tooltip
+                content={theme === 'dark' ? 'Cambiar a modo claro' : 'Cambiar a modo oscuro'}
+                side={tipSide}
+              >
                 <button
                   type="button"
                   onClick={toggle}
                   aria-label={theme === 'dark' ? 'Cambiar a modo claro' : 'Cambiar a modo oscuro'}
-                  className="rounded-md p-1.5 text-notion-text/70 hover:bg-notion-hover"
+                  className="flex size-9 items-center justify-center rounded-md text-notion-text/70 hover:bg-notion-hover"
                 >
                   {theme === 'dark' ? <Sun className="size-4" /> : <Moon className="size-4" />}
                 </button>
               </Tooltip>
-              <Tooltip content="Contraer barra lateral">
+            </div>
+          ) : (
+            <div className="flex min-w-0 items-center justify-between gap-1 px-3 py-3">
+              <Tooltip
+                content="Acerca de ANOtaciones"
+                side="bottom"
+                className="min-w-0 flex-1 overflow-hidden"
+              >
                 <button
                   type="button"
-                  onClick={toggleSidebar}
-                  className="rounded-md p-1.5 text-notion-text/70 hover:bg-notion-hover"
-                  aria-label="Contraer barra lateral"
+                  onClick={() => setAboutOpen(true)}
+                  className="flex min-w-0 max-w-full items-center gap-2 rounded-md pr-1 hover:bg-notion-hover"
+                  aria-label="Acerca de ANOtaciones"
                 >
-                  <PanelLeftClose className="size-4" />
+                  <img src="/logo.png" alt="" className="size-6 shrink-0 rounded object-contain" />
+                  <span className="truncate text-sm font-semibold tracking-tight">ANOtaciones</span>
                 </button>
               </Tooltip>
+              <div className="flex shrink-0 items-center gap-0.5">
+                <Tooltip content="Buscar páginas (Ctrl+K)">
+                  <button
+                    type="button"
+                    aria-label="Buscar páginas (Ctrl+K)"
+                    className="rounded-md p-1.5 text-notion-text/70 hover:bg-notion-hover"
+                    onClick={() => window.dispatchEvent(new Event('anotacion:open-search'))}
+                  >
+                    <Search className="size-4" />
+                  </button>
+                </Tooltip>
+                <ShortcutsHelp />
+                <Tooltip content={theme === 'dark' ? 'Cambiar a modo claro' : 'Cambiar a modo oscuro'}>
+                  <button
+                    type="button"
+                    onClick={toggle}
+                    aria-label={theme === 'dark' ? 'Cambiar a modo claro' : 'Cambiar a modo oscuro'}
+                    className="rounded-md p-1.5 text-notion-text/70 hover:bg-notion-hover"
+                  >
+                    {theme === 'dark' ? <Sun className="size-4" /> : <Moon className="size-4" />}
+                  </button>
+                </Tooltip>
+                <Tooltip content="Contraer barra lateral">
+                  <button
+                    type="button"
+                    onClick={toggleSidebar}
+                    className="rounded-md p-1.5 text-notion-text/70 hover:bg-notion-hover"
+                    aria-label="Contraer barra lateral"
+                  >
+                    <PanelLeftClose className="size-4" />
+                  </button>
+                </Tooltip>
+              </div>
             </div>
+          )}
+        </div>
+
+        {/* Nav + árbol: única zona con scroll; el pie queda siempre visible */}
+        <div
+          className={`min-h-0 flex-1 overflow-x-hidden overflow-y-auto ${
+            collapsed ? 'flex flex-col items-center' : ''
+          }`}
+        >
+          <div className={`space-y-1 pb-2 ${collapsed ? 'flex flex-col items-center px-1' : 'px-2'}`}>
+            <NewPageButton collapsed={collapsed} />
+            {navBtn('Nota del día', CalendarDays, () => {
+              setMainMode('page')
+              void openOrCreateDailyNote()
+            })}
+            {navBtn('Bandeja', Inbox, () => goProductivity('inbox'), mainMode === 'inbox')}
+            {navBtn('Tareas', ListTodo, () => goProductivity('tasks'), mainMode === 'tasks')}
+            {navBtn('Calendario', CalendarRange, () => goProductivity('calendar'), mainMode === 'calendar')}
+            {navBtn(
+              'Panel',
+              LayoutDashboard,
+              () => goProductivity('dashboard'),
+              mainMode === 'dashboard',
+            )}
+            {navBtn(
+              'Favoritos web',
+              Bookmark,
+              () => setMainMode('bookmarks'),
+              mainMode === 'bookmarks',
+            )}
+            {navBtn(
+              'Diagnóstico',
+              Stethoscope,
+              () => setMainMode('diagnostics'),
+              mainMode === 'diagnostics',
+            )}
           </div>
-        )}
 
-        <div className={`space-y-1 pb-2 ${collapsed ? 'flex flex-col items-center px-1' : 'px-2'}`}>
-          <NewPageButton collapsed={collapsed} />
-          {navBtn('Nota del día', CalendarDays, () => {
-            setMainMode('page')
-            void openOrCreateDailyNote()
-          })}
-          {navBtn('Bandeja', Inbox, () => goProductivity('inbox'), mainMode === 'inbox')}
-          {navBtn('Tareas', ListTodo, () => goProductivity('tasks'), mainMode === 'tasks')}
-          {navBtn('Calendario', CalendarRange, () => goProductivity('calendar'), mainMode === 'calendar')}
-          {navBtn(
-            'Panel',
-            LayoutDashboard,
-            () => goProductivity('dashboard'),
-            mainMode === 'dashboard',
-          )}
-          {navBtn(
-            'Favoritos web',
-            Bookmark,
-            () => setMainMode('bookmarks'),
-            mainMode === 'bookmarks',
-          )}
-          {navBtn(
-            'Diagnóstico',
-            Stethoscope,
-            () => setMainMode('diagnostics'),
-            mainMode === 'diagnostics',
-          )}
+          <div className="pb-2">
+            {loading ? (
+              !collapsed && <p className="px-3 text-xs text-notion-text/50">Cargando…</p>
+            ) : (
+              <div
+                onClickCapture={() => {
+                  if (mainMode !== 'page') setMainMode('page')
+                }}
+              >
+                <PageTree collapsed={collapsed} />
+              </div>
+            )}
+          </div>
         </div>
 
-        <div className="min-h-0 flex-1 overflow-y-auto pb-2">
-          {loading ? (
-            !collapsed && <p className="px-3 text-xs text-notion-text/50">Cargando…</p>
-          ) : (
-            <div
-              onClickCapture={() => {
-                if (mainMode !== 'page') setMainMode('page')
-              }}
-            >
-              <PageTree collapsed={collapsed} />
-            </div>
-          )}
+        <div className="relative z-30 shrink-0 overflow-x-hidden">
+          <TrashPanel collapsed={collapsed} />
+          <SidebarBackup collapsed={collapsed} />
         </div>
-
-        <TrashPanel collapsed={collapsed} />
-        <SidebarBackup collapsed={collapsed} />
       </aside>
 
       <main className="min-w-0 flex-1 overflow-y-auto bg-notion-bg">

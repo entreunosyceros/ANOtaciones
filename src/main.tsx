@@ -12,15 +12,15 @@ createRoot(document.getElementById('root')!).render(
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {
     const desktop = new URLSearchParams(location.search).get('app') === '1'
-    if (desktop) {
-      // Lanzador de escritorio: no usar SW (caché de index.html viejo → pantalla blanca).
+    // Dev o escritorio: nunca registrar SW (caché de index/assets → pantalla blanca).
+    if (import.meta.env.DEV || desktop) {
       void navigator.serviceWorker.getRegistrations().then((regs) =>
         Promise.all(regs.map((r) => r.unregister())),
       )
       return
     }
     void navigator.serviceWorker.register('/sw.js').catch(() => {
-      /* ignore SW errors in dev */
+      /* ignore SW errors */
     })
   })
 }

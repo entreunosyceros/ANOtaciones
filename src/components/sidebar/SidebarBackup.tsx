@@ -1,5 +1,6 @@
-import { Download, FileDown, Upload } from 'lucide-react'
-import { useRef, useState } from 'react'
+import { Download, FileDown, HardDriveDownload, Upload } from 'lucide-react'
+import { useEffect, useLayoutEffect, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
 import { usePagesContext } from '../../context/PagesContext'
 import { downloadBackupJson, type ImportMode } from '../../lib/backup'
 import { markBackupExported, shouldRemindBackup } from '../../lib/backupReminders'
@@ -23,7 +24,51 @@ export function SidebarBackup({ collapsed = false }: { collapsed?: boolean }) {
   } = usePagesContext()
   const inputRef = useRef<HTMLInputElement>(null)
   const mdRef = useRef<HTMLInputElement>(null)
+  const rootRef = useRef<HTMLDivElement>(null)
+  const btnRef = useRef<HTMLButtonElement>(null)
+  const flyoutRef = useRef<HTMLDivElement>(null)
   const [remind, setRemind] = useState(() => shouldRemindBackup())
+  const [open, setOpen] = useState(false)
+  const [flyPos, setFlyPos] = useState<{ bottom: number; left: number } | null>(null)
+
+  useEffect(() => {
+    if (!collapsed) setOpen(false)
+  }, [collapsed])
+
+  useLayoutEffect(() => {
+    if (!open || !collapsed || !btnRef.current) {
+      setFlyPos(null)
+      return
+    }
+    const place = () => {
+      const r = btnRef.current!.getBoundingClientRect()
+      setFlyPos({
+        bottom: Math.max(8, window.innerHeight - r.bottom),
+        left: r.right + 4,
+      })
+    }
+    place()
+    window.addEventListener('resize', place)
+    return () => window.removeEventListener('resize', place)
+  }, [open, collapsed])
+
+  useEffect(() => {
+    if (!open || !collapsed) return
+    const onDoc = (e: MouseEvent) => {
+      const t = e.target as Node
+      if (rootRef.current?.contains(t) || flyoutRef.current?.contains(t)) return
+      setOpen(false)
+    }
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setOpen(false)
+    }
+    document.addEventListener('mousedown', onDoc)
+    window.addEventListener('keydown', onKey)
+    return () => {
+      document.removeEventListener('mousedown', onDoc)
+      window.removeEventListener('keydown', onKey)
+    }
+  }, [open, collapsed])
 
   const exportAll = () => {
     downloadBackupJson(
@@ -102,78 +147,8 @@ export function SidebarBackup({ collapsed = false }: { collapsed?: boolean }) {
     URL.revokeObjectURL(url)
   }
 
-  return (
-    <div
-      className={`border-t border-notion-border px-2 py-2 ${
-        collapsed ? 'flex flex-col items-center gap-1' : 'flex flex-col gap-1'
-      }`}
-    >
-      {remind && !collapsed && (
-        <p className="rounded-md bg-amber-500/10 px-2 py-1.5 text-[11px] text-amber-800 dark:text-amber-200">
-          Haz una copia de seguridad. Llevas tiempo sin exportar.
-        </p>
-      )}
-      <div className={collapsed ? 'flex flex-col items-center gap-1' : 'flex flex-wrap gap-1'}>
-        <Tooltip
-          content="Exportar JSON"
-          side={collapsed ? 'right' : 'top'}
-          className={collapsed ? '' : 'flex-1'}
-        >
-          <button
-            type="button"
-            className={`flex w-full items-center justify-center gap-1 rounded-md text-xs text-notion-text/70 hover:bg-notion-hover ${
-              collapsed ? 'size-9' : 'px-2 py-1.5'
-            } ${remind ? 'ring-1 ring-amber-500/50' : ''}`}
-            onClick={exportAll}
-            aria-label="Exportar JSON"
-          >
-            <Download className="size-3.5" />
-            {!collapsed && 'JSON'}
-          </button>
-        </Tooltip>
-        <Tooltip content="Importar JSON" side={collapsed ? 'right' : 'top'} className={collapsed ? '' : 'flex-1'}>
-          <button
-            type="button"
-            className={`flex w-full items-center justify-center gap-1 rounded-md text-xs text-notion-text/70 hover:bg-notion-hover ${
-              collapsed ? 'size-9' : 'px-2 py-1.5'
-            }`}
-            onClick={() => inputRef.current?.click()}
-            aria-label="Importar JSON"
-          >
-            <Upload className="size-3.5" />
-            {!collapsed && 'Importar'}
-          </button>
-        </Tooltip>
-        {!collapsed && (
-          <>
-            <button
-              type="button"
-              title="Exportar página activa a Markdown"
-              className="rounded-md px-2 py-1.5 text-xs text-notion-text/70 hover:bg-notion-hover"
-              onClick={exportActiveMd}
-            >
-              MD
-            </button>
-            <button
-              type="button"
-              title="Importar Markdown"
-              className="rounded-md px-2 py-1.5 text-xs text-notion-text/70 hover:bg-notion-hover"
-              onClick={() => mdRef.current?.click()}
-            >
-              +MD
-            </button>
-            <button
-              type="button"
-              title="Exportar wiki completa"
-              className="flex items-center gap-1 rounded-md px-2 py-1.5 text-xs text-notion-text/70 hover:bg-notion-hover"
-              onClick={() => downloadWikiExport(pages)}
-            >
-              <FileDown className="size-3.5" />
-              Wiki
-            </button>
-          </>
-        )}
-      </div>
+  const fileInputs = (
+    <>
       <input
         ref={inputRef}
         type="file"
@@ -196,6 +171,171 @@ export function SidebarBackup({ collapsed = false }: { collapsed?: boolean }) {
           if (file) importMarkdown(file)
         }}
       />
+    </>
+  )
+
+  if (collapsed) {
+    const actions: { label: string; icon: typeof Download; run: () => void }[] = [
+      {
+        label: 'Exportar JSON',
+        icon: Download,
+        run: () => {
+          exportAll()
+          setOpen(false)
+        },
+      },
+      {
+        label: 'Importar JSON',
+        icon: Upload,
+        run: () => {
+          setOpen(false)
+          inputRef.current?.click()
+        },
+      },
+      {
+        label: 'Exportar Markdown',
+        icon: FileDown,
+        run: () => {
+          exportActiveMd()
+          setOpen(false)
+        },
+      },
+      {
+        label: 'Importar Markdown',
+        icon: Upload,
+        run: () => {
+          setOpen(false)
+          mdRef.current?.click()
+        },
+      },
+      {
+        label: 'Exportar wiki',
+        icon: FileDown,
+        run: () => {
+          downloadWikiExport(pages)
+          setOpen(false)
+        },
+      },
+    ]
+
+    return (
+      <div ref={rootRef} className="relative flex flex-col items-center border-t border-notion-border py-2">
+        <Tooltip content="Copia de seguridad" side="right">
+          <button
+            ref={btnRef}
+            type="button"
+            aria-label="Copia de seguridad"
+            aria-expanded={open}
+            className={`relative flex size-9 items-center justify-center rounded-md text-notion-text/70 hover:bg-notion-hover ${
+              remind ? 'ring-1 ring-amber-500/50' : ''
+            }`}
+            onClick={() => setOpen((v) => !v)}
+          >
+            <HardDriveDownload className="size-4" />
+            {remind && (
+              <span
+                className="absolute right-1.5 top-1.5 size-1.5 rounded-full bg-amber-500"
+                aria-hidden
+              />
+            )}
+          </button>
+        </Tooltip>
+        {open &&
+          flyPos &&
+          createPortal(
+            <div
+              ref={flyoutRef}
+              style={{
+                position: 'fixed',
+                bottom: flyPos.bottom,
+                left: flyPos.left,
+                zIndex: 80,
+              }}
+              className="w-52 rounded-md border border-notion-border bg-notion-bg p-1 shadow-lg"
+            >
+              {remind && (
+                <p className="mb-1 rounded-md bg-amber-500/10 px-2 py-1.5 text-[11px] text-amber-800 dark:text-amber-200">
+                  Haz una copia de seguridad. Llevas tiempo sin exportar.
+                </p>
+              )}
+              {actions.map(({ label, icon: Icon, run }) => (
+                <button
+                  key={label}
+                  type="button"
+                  className="flex w-full items-center gap-2 rounded px-2 py-1.5 text-left text-sm text-notion-text hover:bg-notion-hover"
+                  onClick={run}
+                >
+                  <Icon className="size-3.5 shrink-0 opacity-60" />
+                  {label}
+                </button>
+              ))}
+            </div>,
+            document.body,
+          )}
+        {fileInputs}
+      </div>
+    )
+  }
+
+  return (
+    <div className="flex flex-col gap-1 border-t border-notion-border px-2 py-2">
+      {remind && (
+        <p className="rounded-md bg-amber-500/10 px-2 py-1.5 text-[11px] text-amber-800 dark:text-amber-200">
+          Haz una copia de seguridad. Llevas tiempo sin exportar.
+        </p>
+      )}
+      <div className="flex flex-wrap gap-1">
+        <Tooltip content="Exportar JSON" side="top" className="flex-1">
+          <button
+            type="button"
+            className={`flex w-full items-center justify-center gap-1 rounded-md px-2 py-1.5 text-xs text-notion-text/70 hover:bg-notion-hover ${
+              remind ? 'ring-1 ring-amber-500/50' : ''
+            }`}
+            onClick={exportAll}
+            aria-label="Exportar JSON"
+          >
+            <Download className="size-3.5" />
+            JSON
+          </button>
+        </Tooltip>
+        <Tooltip content="Importar JSON" side="top" className="flex-1">
+          <button
+            type="button"
+            className="flex w-full items-center justify-center gap-1 rounded-md px-2 py-1.5 text-xs text-notion-text/70 hover:bg-notion-hover"
+            onClick={() => inputRef.current?.click()}
+            aria-label="Importar JSON"
+          >
+            <Upload className="size-3.5" />
+            Importar
+          </button>
+        </Tooltip>
+        <button
+          type="button"
+          title="Exportar página activa a Markdown"
+          className="rounded-md px-2 py-1.5 text-xs text-notion-text/70 hover:bg-notion-hover"
+          onClick={exportActiveMd}
+        >
+          MD
+        </button>
+        <button
+          type="button"
+          title="Importar Markdown"
+          className="rounded-md px-2 py-1.5 text-xs text-notion-text/70 hover:bg-notion-hover"
+          onClick={() => mdRef.current?.click()}
+        >
+          +MD
+        </button>
+        <button
+          type="button"
+          title="Exportar wiki completa"
+          className="flex items-center gap-1 rounded-md px-2 py-1.5 text-xs text-notion-text/70 hover:bg-notion-hover"
+          onClick={() => downloadWikiExport(pages)}
+        >
+          <FileDown className="size-3.5" />
+          Wiki
+        </button>
+      </div>
+      {fileInputs}
     </div>
   )
 }
